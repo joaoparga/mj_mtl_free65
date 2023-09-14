@@ -1,0 +1,119 @@
+---
+title: "01_geocode_data"
+format: html
+editor: source
+---
+
+# Setup
+
+```{r}
+#| echo: false
+library(tidyverse)
+library(sf)
+library(data.table)
+library(janitor)
+library(fs)
+library(ggmap)
+```
+
+# Read data
+
+```{r}
+df_montreal <- data.table::fread("data/MontrealRawData_2023_08_24.csv")
+df_montreal <- janitor::clean_names(df_montreal)
+```
+
+
+# Geolocate 
+
+Some observations don't have the necessary location longitude and latitude. We need to geocode them.
+
+However, some of these observations also don't have the necessary information for geocoding (either the postal code, at `q51`, or the nearest intersection, at `q50`). 
+We will, then, geocode the observations that we can, i.e., those we have available information.
+
+```{r}
+#| label: fix postal codes
+data.table::setDT(df_montreal)
+
+df_montreal[nchar(q51)==10, q51 := gsub("[[:space:]]", "", q51)]
+
+df_montreal[
+  ,
+  q51 := str_trim(q51)
+]
+
+df_montreal[
+  nchar(q51)==6
+  , q51 := gsub(q51, pattern = "(.{3})(.*)", replacement = "\\1 \\2")
+]
+
+
+df_montreal[q51=="H4x c1c7", q51 := "H4x 1c7"]
+df_montreal[q51=="H4G 2P2’", q51 := "H4G 2P2"]
+
+```
+
+```{r}
+#| label: geocode
+key <- data.table::fread(file = "data/google_key.csv", header = F)
+
+ggmap::register_google(key = key)
+
+# geocode intersections
+intersections <- df_montreal %>% filter(is.na(location_latitude) & nchar(q50)!= 0) %>% 
+  select(v1, q50)
+
+geo1 <- purrr::map(
+  intersections$q50
+  , ~ggmap::geocode(
+    ., output = "latlona", source = "google"
+  )
+)
+
+# error with intersections #2 ("Laurier et Parc")
+# remove from object
+geo1 <- geo1[[1]]
+
+# add v1 for referencing
+geo1$v1 <- intersections$v1[[1]]
+
+# geocode postal codes
+postal <- df_montreal %>% 
+  filter(is.na(location_latitude) & nchar(q51)!=0) %>% 
+  select(v1, q51)
+
+geo2 <- purrr::map(
+  postal$q51
+  , ~ggmap::geocode(
+    .
+    , output = "latlona", source = "google"
+  )
+)
+
+geo2 <- data.table::rbindlist(geo2)
+
+# add v1 for referencing
+geo2$v1 <- postal$v1
+
+geo <- rbindlist(list(geo1, geo2))
+data.table::setDT(geo)
+
+geo <- geo[order(v1)]
+df_montreal <- df_montreal[order(v1)]
+
+df_montreal[
+  v1 %in% geo$v1
+  , `:=`(
+      location_latitude = geo$lat
+      , location_longitude = geo$lon
+  )
+]
+```
+
+
+# Save data
+
+```{r}
+data.table::fwrite(df_montreal, file = "data/montreal_geolocated.csv")
+```
+
