@@ -1,0 +1,256 @@
+---
+title: "01_geocode_data"
+format: html
+editor: source
+---
+
+# Setup
+
+```{r}
+#| echo: false
+#| warning: false
+library(tidyverse)
+library(sf)
+library(data.table)
+library(janitor)
+library(fs)
+library(cancensus)
+library(tmap)
+library(DataExplorer)
+library(patchwork)
+```
+
+# Census data
+
+## Set up cancencus
+
+Set api key
+
+```{r}
+census_key <- data.table::fread("data/census_api_key.csv", header = F)
+census_key <- census_key %>% as_vector()
+options(cancensus.api_key = census_key)
+```
+
+Set up cache
+
+```{r}
+dir_create("./cache")
+options(cancensus.cache_path = "./cache")
+```
+
+## Download census data
+
+```{r}
+montreal_cma_ct <- get_census(
+  # 2021 census
+  dataset = 'CA21', 
+  
+  # toronto is CMA code 535; oshawa 532
+  regions = list(
+    CMA = c("24462") # metro -> necessary for plotting all the data
+    # CD = c("2466") # regional district
+    # CSD = c("2466023") # city
+    ),
+  
+  # our variables of interest
+  vectors = c(
+    "male_tot" = "v_CA21_9"
+    ,"female_tot" = "v_CA21_10"
+    , "age_0_14" = "v_CA21_11"
+    , "age_15_19" = "v_CA21_71"
+    , "age_20_24" = "v_CA21_89"
+    , "age_25_29" = "v_CA21_107"
+    , "age_30_34" = "v_CA21_125"
+    , "age_35_39" = "v_CA21_143"
+    , "age_40_44" = "v_CA21_161"
+    , "age_45_49" = "v_CA21_179"
+    , "age_50_54" = "v_CA21_197"
+    , "age_55_59" = "v_CA21_215"
+    , "age_60_64" = "v_CA21_233"
+    , "age_65_over" = "v_CA21_251"
+    ),
+  
+  # census DA geography
+  level = 'CT',
+  
+  # put the downloaded data in our cache directory
+  use_cache = TRUE,
+  
+  # get the associated geography in {sf} format
+  geo_format = 'sf'
+) %>% janitor::clean_names()
+
+
+
+montreal_cd_ct <- get_census(
+  # 2021 census
+  dataset = 'CA21', 
+  
+  # toronto is CMA code 535; oshawa 532
+  regions = list(
+    # CMA = c("24462") # metro -> necessary for plotting all the data
+    CD = c("2466") # regional district
+    # CSD = c("2466023") # city
+    ),
+  
+  # our variables of interest
+  vectors = c(
+    "male_tot" = "v_CA21_9"
+    ,"female_tot" = "v_CA21_10"
+    , "age_0_14" = "v_CA21_11"
+    , "age_15_19" = "v_CA21_71"
+    , "age_20_24" = "v_CA21_89"
+    , "age_25_29" = "v_CA21_107"
+    , "age_30_34" = "v_CA21_125"
+    , "age_35_39" = "v_CA21_143"
+    , "age_40_44" = "v_CA21_161"
+    , "age_45_49" = "v_CA21_179"
+    , "age_50_54" = "v_CA21_197"
+    , "age_55_59" = "v_CA21_215"
+    , "age_60_64" = "v_CA21_233"
+    , "age_65_over" = "v_CA21_251"
+    ),
+  
+  # census DA geography
+  level = 'CT',
+  
+  # put the downloaded data in our cache directory
+  use_cache = TRUE,
+  
+  # get the associated geography in {sf} format
+  geo_format = 'sf'
+) %>% janitor::clean_names()
+```
+
+Set crs for census data
+
+```{r}
+# utm zone for montreal: utm18 -> epsg 26918
+# https://mangomap.com/robertyoung/maps/69585/what-utm-zone-am-i-in-#
+montreal_cma_ct <- sf::st_transform(montreal_cma_ct, crs = 26918)
+montreal_cd_ct <- sf::st_transform(montreal_cd_ct, crs = 26918)
+# sf::st_crs(montreal_cma_ct) <- 4326
+# sf::st_crs(montreal_cd_ct) <- 4326
+```
+
+# Read survey data
+
+```{r}
+survey_sf <- sf::st_read("data/df_montreal_filter_sf.gpkg")
+survey_sf <- sf::st_transform(survey_sf, crs = 26918)
+```
+
+# Plot census and survey data
+
+Create buffer for finding points inside polygons:
+
+```{r}
+cd_buff <- sf::st_buffer(montreal_cd_ct, 250)
+cma_buff <- sf::st_buffer(montreal_cma_ct, 250)
+```
+
+Find survey respondents that live inside Montreal (CD or CMA?).
+
+```{r}
+survey_filter_cd <- sf::st_filter(survey_sf, cd_buff)
+
+# survey_sf <- survey_sf %>% 
+#   dplyr::mutate(
+#     inside_cma = lengths(sf::st_intersects(survey_sf, cma_buff))
+#     , inside_cd = lengths(sf::st_intersects(survey_sf, cd_buff))
+#   )
+```
+
+Plot boundaries and points to check which points fall outside the 250m buffer.
+
+```{r}
+tm_shape(montreal_cma_ct) +
+  tm_polygons(col = "beige") +
+  tm_shape(montreal_cd_ct) +
+  tm_polygons() +
+  tm_shape(survey_filter_cd) +
+  tm_dots()
+```
+
+Filter points inside polygons
+
+```{r}
+# survey_inside_cd <- survey_sf %>%
+#   filter(inside_cd > 1)
+# 
+# survey_inside_cma <- survey_sf %>% 
+#   filter(inside_cma > 1)
+```
+
+# Create categories survey
+
+*Reminder*: our objective is to compare the spatial distribution of the sample agains the spatial distribution of the *population over 50* at the CT level.
+
+To do so, we check if the sample *underrepresents* (i.e., has a *smaller* percentage of people over 50 than the percentage of individuals from that age within the CT according to the census) or **overrepresents** (i.e., has a **higher** percentage than the census).
+
+We need to create a category for people over 50.
+```{r}
+
+cma_pop = sum(montreal_cma_ct$population, na.rm = T)
+cd_pop = sum(montreal_cd_ct$population, na.rm = T)
+
+montreal_cma_ct <- montreal_cma_ct %>% 
+  dplyr::mutate(
+    age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
+    , prop_age_50_over = age_50_over / cma_pop
+  )
+
+montreal_cd_ct <- montreal_cd_ct %>% 
+  dplyr::mutate(
+    age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
+    , prop_age_50_over = age_50_over / cd_pop
+  )
+```
+
+```{r}
+# consider survey size only those inside cd boundaries
+survey_size_cd = nrow(survey_filter_cd)
+
+# % of individuals that live within each CT (number of individuals in CT / total observations in the sample)
+
+montreal_cd_ct <- montreal_cd_ct %>% 
+  mutate(
+    count_survey = lengths(sf::st_intersects(montreal_cd_ct, survey_filter_cd)) 
+    , prop_survey = count_survey / survey_size_cd
+  )
+
+```
+
+
+```{r}
+
+# compare distributions
+DataExplorer::plot_histogram(montreal_cd_ct %>% select(prop_age_50_over, prop_survey))
+
+
+# FIGURE OUT HOW TO COMPARE THESE PROPORTIONS
+montreal_cd_ct <- montreal_cd_ct %>% 
+  mutate(
+    representation = case_when(
+      prop_survey < 
+    )
+  )
+```
+
+```{r}
+# plot spatial distributions
+tm1 <- tm_shape(montreal_cd_ct) + tm_fill(col = "prop_age_50_over", style = "jenks")
+tm2 <- tm_shape(montreal_cd_ct) + tm_fill(col = "prop_survey", style = "jenks") +
+  tm_shape(survey_filter_cd) + tm_dots()
+
+tmap_arrange(tm1, tm2)
+```
+
+
+# Save data
+
+```{r}
+
+
+```
