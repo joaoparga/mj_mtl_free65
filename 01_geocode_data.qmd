@@ -133,9 +133,9 @@ sf::st_crs(df_montreal_filter_sf) <- 4326
 # Save data
 
 ```{r}
-data.table::fwrite(df_montreal, file = "data/montreal_geolocated_complete.csv")
-data.table::fwrite(df_montreal_filter, file = "data/montreal_geolocated_filtered.csv")
-sf::st_write(df_montreal_filter_sf, "data/df_montreal_filter_sf.gpkg", append = F)
+data.table::fwrite(df_montreal, file = "data/df_survey_montreal_geolocated_complete.csv")
+data.table::fwrite(df_montreal_filter, file = "data/df_survey_montreal_geolocated_filtered.csv")
+sf::st_write(df_montreal_filter_sf, "data/df_survey_montreal_filter_sf.gpkg", append = F)
 ```
 
 

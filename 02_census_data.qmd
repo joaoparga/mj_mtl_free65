@@ -19,8 +19,14 @@ library(tmap)
 library(DataExplorer)
 library(patchwork)
 ```
+# Read survey data
 
-# Census data
+```{r}
+survey_sf <- sf::st_read("data/df_survey_montreal_filter_sf.gpkg")
+survey_sf <- sf::st_transform(survey_sf, crs = 26918)
+```
+
+# CT Census Tract data
 
 ## Set up cancencus
 
@@ -134,14 +140,8 @@ montreal_cd_ct <- sf::st_transform(montreal_cd_ct, crs = 26918)
 # sf::st_crs(montreal_cd_ct) <- 4326
 ```
 
-# Read survey data
 
-```{r}
-survey_sf <- sf::st_read("data/df_montreal_filter_sf.gpkg")
-survey_sf <- sf::st_transform(survey_sf, crs = 26918)
-```
-
-# Plot census and survey data
+## Plot CT and survey data
 
 Create buffer for finding points inside polygons:
 
@@ -160,6 +160,13 @@ survey_filter_cd <- sf::st_filter(survey_sf, cd_buff)
 #     inside_cma = lengths(sf::st_intersects(survey_sf, cma_buff))
 #     , inside_cd = lengths(sf::st_intersects(survey_sf, cd_buff))
 #   )
+
+# filter points inside polygon
+# survey_inside_cd <- survey_sf %>%
+#   filter(inside_cd > 0)
+# 
+# survey_inside_cma <- survey_sf %>% 
+#   filter(inside_cma > 0)
 ```
 
 Plot boundaries and points to check which points fall outside the 250m buffer.
@@ -173,17 +180,7 @@ tm_shape(montreal_cma_ct) +
   tm_dots()
 ```
 
-Filter points inside polygons
-
-```{r}
-# survey_inside_cd <- survey_sf %>%
-#   filter(inside_cd > 1)
-# 
-# survey_inside_cma <- survey_sf %>% 
-#   filter(inside_cma > 1)
-```
-
-# Create categories survey
+## Create categories survey
 
 *Reminder*: our objective is to compare the spatial distribution of the sample agains the spatial distribution of the *population over 50* at the CT level.
 
@@ -220,31 +217,140 @@ montreal_cd_ct <- montreal_cd_ct %>%
     , prop_survey = count_survey / survey_size_cd
   )
 
+# count number of points in polygons
+ptsinpoly <- st_intersects(montreal_cd_ct, survey_sf)
+montreal_cd_ct$count <- lengths(ptsinpoly)
+
+# plot number of survey respondents in each CT
+tm_shape(montreal_cd_ct) + 
+  tm_fill(
+    col = "count_survey"
+    # , style = "jenks"
+    , pal=c("grey",RColorBrewer::brewer.pal(4, "YlOrBr"))
+    )
 ```
+
+
+```{r}
+montreal_cd_ct <- montreal_cd_ct %>% 
+  mutate(
+    intervals = cut(prop_survey, breaks = c(c(0, 0.003, 0.010, 0.024, 0.048, 0.146)))
+  )
+
+# tm_shape(montreal_cd_ct) + 
+#   tm_fill(col = "intervals", palette = "YlGnBu")
+```
+
+
+```{r}
+# plot spatial distributions
+tm1 <- tm_shape(montreal_cd_ct) + 
+  tm_fill(col = "prop_age_50_over", style = "jenks", palette = "YlOrBr")
+tm2 <- tm_shape(montreal_cd_ct) + 
+  tm_fill(col = "intervals", palette = "YlOrBr", title = "prop_survey")
+# tm2 <- tm_shape(montreal_cd_ct) + tm_fill(col = "prop_survey", style = "jenks") +
+#   tm_shape(survey_filter_cd) + tm_dots()
+
+# get island's centroid
+montreal_union <- montreal_cd_ct %>% 
+  mutate(all = "all") %>% 
+  group_by(all) %>% 
+  summarise() %>% 
+  ungroup()
+
+montreal_centroid <- sf::st_centroid(montreal_union)
+
+tm2 <- tm2 + tm_shape(montreal_centroid) + tm_dots(size = 0.125)
+
+tmap_arrange(tm1, tm2)
+```
+
 
 
 ```{r}
 
 # compare distributions
 DataExplorer::plot_histogram(montreal_cd_ct %>% select(prop_age_50_over, prop_survey))
-
-
-# FIGURE OUT HOW TO COMPARE THESE PROPORTIONS
-montreal_cd_ct <- montreal_cd_ct %>% 
-  mutate(
-    representation = case_when(
-      prop_survey < 
-    )
-  )
 ```
 
-```{r}
-# plot spatial distributions
-tm1 <- tm_shape(montreal_cd_ct) + tm_fill(col = "prop_age_50_over", style = "jenks")
-tm2 <- tm_shape(montreal_cd_ct) + tm_fill(col = "prop_survey", style = "jenks") +
-  tm_shape(survey_filter_cd) + tm_dots()
 
-tmap_arrange(tm1, tm2)
+```{r}
+# FIGURE OUT HOW TO COMPARE THESE PROPORTIONS
+# montreal_cd_ct <- montreal_cd_ct %>%
+#   mutate(
+#     representation = case_when(
+#       prop_survey <
+#     )
+#   )
+```
+
+# FSA data
+
+## Read demographic data
+```{r}
+# demographic information for fsa downloaded at chass website
+# http://dc.chass.utoronto.ca.myaccess.library.utoronto.ca/cgi-bin/census/2021/displayCensus.cgi?year=2021&geo=fsa#
+
+# list of montreal's fsa at:
+# https://ofomaps.com/downloads/montreal-fsa-map/
+
+# fsa dictionary
+fsa_dic <- readr::read_delim("data/chass fsa dictionary 2021.txt")
+# fsa data
+montreal_fsa <- data.table::fread("data/chass fsa 2021 montreal h1a h9x.csv")
+montreal_fsa <- montreal_fsa %>% janitor::clean_names()
+# rename columns
+data.table::setnames(
+  montreal_fsa
+  , old = colnames(montreal_fsa)
+  , new = c(
+    "geouid"
+    , "fsa_name"
+    , "population_2021"
+    , "total_age"
+    , "age_0_14"
+    , "age_15_19"
+    , "age_20_24"
+    , "age_25_29"
+    , "age_30_34"
+    , "age_35_39"
+    , "age_40_44"
+    , "age_45_49"
+    , "age_50_54"
+    , "age_55_59"
+    , "age_60_64"
+    , "age_65_over"
+  )
+)
+```
+
+## Read spatial data
+```{r}
+
+# fsa shapefile downloaded at statscan website
+# https://www12.statcan.gc.ca/census-recensement/alternative_alternatif.cfm?l=eng&dispext=zip&teng=lfsa000b21a_e.zip&k=%20%20%20158240&loc=//www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip
+fsa_shp <- sf::st_read("data/statscan_fsa census_2021/lfsa000b21a_e.shp")
+fsa_shp <- janitor::clean_names(fsa_shp)
+```
+
+
+## Filter FSA
+
+```{r}
+# select fsa from montreal chass data
+fsa_shp <- fsa_shp %>% 
+  filter(cfsauid %in% unique(montreal_fsa$geouid))
+```
+
+Change crs montreal's UTM Zone 
+```{r}
+# utm zone for montreal: utm18 -> epsg 26918
+fsa_shp <- sf::st_transform(fsa_shp, 26918)
+```
+
+## Save montreal FSA .shp
+```{r}
+sf::st_write(fsa_shp, "data/statscan_montreal_fsa.gpkg")
 ```
 
 
