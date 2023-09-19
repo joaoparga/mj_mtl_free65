@@ -141,7 +141,7 @@ montreal_cd_ct <- sf::st_transform(montreal_cd_ct, crs = 26918)
 ```
 
 
-## Plot CT and survey data
+## Buffer: Plot CT and survey data
 
 Create buffer for finding points inside polygons:
 
@@ -188,7 +188,7 @@ To do so, we check if the sample *underrepresents* (i.e., has a *smaller* percen
 
 We need to create a category for people over 50.
 ```{r}
-
+# get total population sum
 cma_pop = sum(montreal_cma_ct$population, na.rm = T)
 cd_pop = sum(montreal_cd_ct$population, na.rm = T)
 
@@ -234,8 +234,10 @@ tm_shape(montreal_cd_ct) +
 ```{r}
 montreal_cd_ct <- montreal_cd_ct %>% 
   mutate(
-    intervals = cut(prop_survey, breaks = c(c(0, 0.003, 0.010, 0.024, 0.048, 0.146)))
-  )
+    intervals = cut(
+      prop_survey
+      , breaks = c(0, 0.003, 0.010, 0.024, 0.048, 0.146))
+    )
 
 # tm_shape(montreal_cd_ct) + 
 #   tm_fill(col = "intervals", palette = "YlGnBu")
@@ -243,26 +245,25 @@ montreal_cd_ct <- montreal_cd_ct %>%
 
 
 ```{r}
+#| warning: false
 # plot spatial distributions
-tm1 <- tm_shape(montreal_cd_ct) + 
+tmct_census <- tm_shape(montreal_cd_ct) + 
   tm_fill(col = "prop_age_50_over", style = "jenks", palette = "YlOrBr")
-tm2 <- tm_shape(montreal_cd_ct) + 
+tmct_survey <- tm_shape(montreal_cd_ct) + 
   tm_fill(col = "intervals", palette = "YlOrBr", title = "prop_survey")
-# tm2 <- tm_shape(montreal_cd_ct) + tm_fill(col = "prop_survey", style = "jenks") +
-#   tm_shape(survey_filter_cd) + tm_dots()
 
 # get island's centroid
-montreal_union <- montreal_cd_ct %>% 
-  mutate(all = "all") %>% 
-  group_by(all) %>% 
-  summarise() %>% 
-  ungroup()
+# montreal_union <- montreal_cd_ct %>% 
+#   mutate(all = "all") %>% 
+#   group_by(all) %>% 
+#   summarise() %>% 
+#   ungroup()
+# 
+# montreal_centroid <- sf::st_centroid(montreal_union)
+# 
+# tm2 <- tm2 + tm_shape(montreal_centroid) + tm_dots(size = 0.125)
 
-montreal_centroid <- sf::st_centroid(montreal_union)
-
-tm2 <- tm2 + tm_shape(montreal_centroid) + tm_dots(size = 0.125)
-
-tmap_arrange(tm1, tm2)
+tmap_arrange(tmct_census, tmct_survey)
 ```
 
 
@@ -325,8 +326,8 @@ data.table::setnames(
 ```
 
 ## Read spatial data
-```{r}
 
+```{r}
 # fsa shapefile downloaded at statscan website
 # https://www12.statcan.gc.ca/census-recensement/alternative_alternatif.cfm?l=eng&dispext=zip&teng=lfsa000b21a_e.zip&k=%20%20%20158240&loc=//www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip
 fsa_shp <- sf::st_read("data/statscan_fsa census_2021/lfsa000b21a_e.shp")
@@ -348,9 +349,164 @@ Change crs montreal's UTM Zone
 fsa_shp <- sf::st_transform(fsa_shp, 26918)
 ```
 
+## Plot CT and FSA maps
+FSA map appears to contain a territorty larger than the boundaries of the island of Montreal.
+The plot below shows which postal codes can be excluded from the FSA .shp so that CT and FSA refer to the same areas.
+
+```{r}
+tmct <- tm_shape(montreal_cd_ct) + tm_polygons()
+tmfsa <- tm_shape(fsa_shp) + tm_polygons() + tm_text("cfsauid", size = 0.75)
+tmap_arrange(tmct, tmfsa)
+```
+
+We can then remove FSAs that contain the initials *"H7"*.
+
+```{r}
+# filter out FSAs whose postal codes start with H7
+fsa_shp <- fsa_shp %>% 
+  filter(!str_detect(fsa_shp$cfsauid, "^H7"))
+
+# plot to check .shp
+tmfsa_filter <- tm_shape(fsa_shp) + 
+  tm_polygons() + 
+  tm_text("cfsauid", size = 0.75)
+
+tmap_arrange(tmct, tmfsa_filter)
+```
+
+
 ## Save montreal FSA .shp
 ```{r}
-sf::st_write(fsa_shp, "data/statscan_montreal_fsa.gpkg")
+sf::st_write(fsa_shp, "data/statscan_montreal_fsa.gpkg", append = F)
+```
+
+## Buffer: plot FSA and survey data
+
+Create buffer for finding points inside polygons:
+
+```{r}
+cd_buff_fsa <- sf::st_buffer(fsa_shp, 250)
+```
+
+Find survey respondents that live inside Montreal (CD).
+
+```{r}
+survey_filter_cd_fsa <- sf::st_filter(survey_sf, cd_buff_fsa)
+```
+
+Plot boundaries and points to check which points fall outside the 250m buffer.
+
+```{r}
+tm_shape(montreal_cma_ct) +
+  tm_polygons(col = "beige") +
+  tm_shape(fsa_shp) +
+  tm_polygons() +
+  tm_shape(survey_filter_cd_fsa) +
+  tm_dots()
+```
+
+## Join CRASS data with FSA .shp
+
+```{r}
+# filter montreal fsa according to map
+montreal_fsa <- montreal_fsa %>% 
+  filter(geouid %in% unique(fsa_shp$cfsauid))
+
+# left join sf and data frame
+# https://gis.stackexchange.com/questions/225729/left-join-breaking-sf
+
+# https://r-spatial.github.io/sf/reference/tidyverse.html
+# unable how to use left_join.sf
+
+# left join categories chass data with shp
+montreal_fsa <- montreal_fsa %>% 
+  left_join(
+    fsa_shp %>% select(cfsauid, geometry)
+    , by = c("geouid" = "cfsauid")
+  )
+
+montreal_fsa <- montreal_fsa %>% sf::st_as_sf()
+
+```
+
+
+## Create categories for survey and census data at FSA level
+
+```{r}
+# get total population sum
+cd_pop_fsa = sum(montreal_fsa$total_age, na.rm = T)
+
+montreal_fsa <- montreal_fsa %>% 
+  dplyr::mutate(
+    age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
+    , prop_age_50_over = age_50_over / cma_pop
+  )
+```
+
+
+```{r}
+montreal_fsa <- montreal_fsa %>% 
+  mutate(
+    count_survey = lengths(
+      sf::st_intersects(montreal_fsa, survey_filter_cd_fsa)
+      ) 
+    , prop_survey = count_survey / survey_size_cd
+  )
+
+# plot number of survey respondents in each CT
+tm_shape(montreal_fsa) + 
+  tm_fill(
+    col = "count_survey"
+    # , style = "jenks"
+    , pal=c("grey",RColorBrewer::brewer.pal(4, "YlOrBr"))
+    )
+```
+
+```{r}
+# get jenks natural breaks for plotting
+tm_shape(montreal_fsa) + 
+  tm_fill(
+    col = "prop_survey"
+     , style = "jenks"
+    #, pal=c("grey",RColorBrewer::brewer.pal(4, "YlOrBr"))
+    )
+
+# create intervals for plotting
+montreal_fsa <- montreal_fsa %>% 
+  mutate(
+    intervals = cut(
+      prop_survey
+      , breaks = c(0, 0.003, 0.011, 0.024, 0.048, 0.146))
+    )
+```
+
+
+```{r}
+#| warning: false
+# plot spatial distributions
+tmfsa_census <- tm_shape(montreal_fsa) + 
+  tm_polygons(col = "prop_age_50_over", style = "jenks", palette = "YlOrBr") +
+  tm_text("geouid", size = 0.4)
+tmfsa_survey <- tm_shape(montreal_fsa) + 
+  tm_polygons(col = "intervals", palette = "YlOrBr", title = "prop_survey") +
+  tm_text("geouid", size = 0.4)
+# tm2 <- tm_shape(montreal_cd_ct) + tm_fill(col = "prop_survey", style = "jenks") 
+tmap_arrange(tmfsa_census, tmfsa_survey)
+```
+
+# Compare CT and FSA spatial distributions
+
+```{r}
+#| warning: false
+# plot spatial distributions
+tm_ct_fsa <- tmap_arrange(tmct_census, tmct_survey, tmfsa_census, tmfsa_survey, ncol = 2)
+
+# save map
+tmap_save(
+  tm_ct_fsa
+  , filename = "figures/proportion_census_survey_ct_fsa.png"
+  # , width = 1000, height = 750, dpi = 900
+  )
 ```
 
 

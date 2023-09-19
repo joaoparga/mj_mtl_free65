@@ -1,0 +1,177 @@
+---
+title: "01_geocode_data"
+format: html
+editor: source
+---
+
+# Setup
+
+```{r}
+#| echo: false
+#| warning: false
+library(tidyverse)
+library(sf)
+library(data.table)
+library(janitor)
+library(fs)
+library(ggmap)
+```
+
+# Read data
+
+```{r}
+df_montreal <- data.table::fread("data/utscfiletransfer/Montreal_Corrected_Geocoding_2023_09_18.csv")
+df_montreal <- janitor::clean_names(df_montreal)
+# -79 = longitude, 45 = latitude
+
+# old data
+old_montreal <- data.table::fread("data/MontrealRawData_2023_08_24.csv") %>% 
+  janitor::clean_names()
+```
+
+```{r}
+# rename lat lon columns
+data.table::setnames(
+  df_montreal
+  , old = c("fx", "fy")
+  , new = c("lon", "lat")
+  )
+```
+
+
+# Geolocate 
+
+Check 
+
+```{r}
+# postal codes https://prd11.wsl.canadapost.ca/scp/doc/fr/soutien/bc/stpn/liste-des-rta-octobre-2021.pdf
+
+#| label: fix postal codes
+data.table::setDT(df_montreal)
+
+df_montreal[nchar(q51)==10, q51 := gsub("[[:space:]]", "", q51)]
+
+df_montreal[
+  ,
+  q51 := str_trim(q51)
+]
+
+df_montreal[
+  nchar(q51)==6
+  , q51 := gsub(q51, pattern = "(.{3})(.*)", replacement = "\\1 \\2")
+]
+
+
+df_montreal[q51=="H4x c1c7", q51 := "H4x 1c7"]
+df_montreal[q51=="H4G 2P2’", q51 := "H4G 2P2"]
+```
+
+
+
+```{r}
+#| label: geocode
+key <- data.table::fread(file = "data/google_key.csv", header = F)
+
+ggmap::register_google(key = key)
+
+# unable to geocode intersections because of absence of column q50 (containing intersections)
+# geocode intersections
+# intersections <- df_montreal %>% filter(is.na(location_latitude) & nchar(q50)!= 0) %>% 
+#   select(v1, q50)
+# 
+# geo1 <- purrr::map(
+#   intersections$q50
+#   , ~ggmap::geocode(
+#     ., output = "latlona", source = "google"
+#   )
+# )
+# 
+# # error with intersections #2 ("Laurier et Parc")
+# # remove from object
+# geo1 <- geo1[[1]]
+# 
+# # add v1 for referencing
+# geo1$v1 <- intersections$v1[[1]]
+
+# geocode postal codes
+postal <- df_montreal[
+  is.na(lon) & nchar(q51)!=0 & str_detect(q51, "^H")
+  , .(v1, q51)
+] 
+
+geo <- purrr::map(
+  postal$q51
+  , ~ggmap::geocode(
+    .
+    , output = "latlona", source = "google"
+  )
+)
+
+geo <- data.table::rbindlist(geo, fill = T)
+
+# add v1 for referencing
+geo$v1 <- postal$v1
+
+data.table::setDT(geo)
+
+geo <- geo[order(v1)]
+df_montreal <- df_montreal[order(v1)]
+geo <- geo[complete.cases(geo)]
+
+df_montreal[
+  v1 %in% geo$v1
+  , `:=`(
+      lat = geo$lat
+      , lon = geo$lon
+  )
+]
+```
+# Fix lat column
+Replace special charcters
+```{r}
+# get all types of special characters in lat column
+strsplit(df_montreal$lat, "") %>% unlist() %>% unique()
+
+# replace special characters <,> <\>
+df_montreal[
+  ,
+  lat := str_replace_all(df_montreal$lat, "\\\\|,", "")
+]
+```
+
+
+# Filter 
+Filter observations with available location data.
+
+```{r}
+# convert coordinates to dbl
+df_montreal[
+  ,
+  lat := as.double(lat)
+]
+
+df_montreal_filter <- df_montreal %>% 
+  filter(!is.na(lat) | !is.na(lon))
+```
+
+
+# Convert to sf
+```{r}
+df_montreal_filter_sf <- df_montreal_filter %>% 
+  sf::st_as_sf(coords = c("lon","lat"))
+
+# set crs 4326
+sf::st_crs(df_montreal_filter_sf) <- 4326
+```
+
+
+# Save data
+
+```{r}
+data.table::fwrite(df_montreal, file = "data/df_survey_montreal_geolocated_complete_new.csv")
+data.table::fwrite(df_montreal_filter, file = "data/df_survey_montreal_geolocated_filtered_new.csv")
+sf::st_write(df_montreal_filter_sf, "data/df_survey_montreal_filter_sf_new.gpkg", append = F)
+```
+
+
+
