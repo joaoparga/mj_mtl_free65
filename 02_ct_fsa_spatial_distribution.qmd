@@ -22,7 +22,7 @@ library(patchwork)
 # Read survey data
 
 ```{r}
-survey_sf <- sf::st_read("data/df_survey_montreal_filter_sf.gpkg")
+survey_sf <- sf::st_read("data/df_survey_montreal_filter_sf_new.gpkg")
 survey_sf <- sf::st_transform(survey_sf, crs = 26918)
 ```
 
@@ -153,7 +153,23 @@ cma_buff <- sf::st_buffer(montreal_cma_ct, 250)
 Find survey respondents that live inside Montreal (CD or CMA?).
 
 ```{r}
-survey_filter_cd <- sf::st_filter(survey_sf, cd_buff)
+# select geometries
+f_st_filter <- function(points_df, buff_df){
+  
+  points_df_geom <- points_df %>% select(v1, geom)
+  buff_df_geom <- buff_df %>% select(geo_uid, geometry)
+  
+  df_st_filter <- sf::st_filter(points_df_geom, buff_df_geom)
+  
+  points_df <- points_df %>% sf::st_drop_geometry()
+  
+  df_join <- left_join(points_df, df_st_filter)
+  df_join <- df_join %>% sf::st_as_sf()
+}
+
+survey_filter_cd <- f_st_filter(survey_sf, cd_buff)
+
+# survey_filter_cd <- sf::st_filter(survey_sf, cd_buff, .predicate = st_intersects)
 
 # survey_sf <- survey_sf %>% 
 #   dplyr::mutate(
@@ -172,6 +188,10 @@ survey_filter_cd <- sf::st_filter(survey_sf, cd_buff)
 Plot boundaries and points to check which points fall outside the 250m buffer.
 
 ```{r}
+
+66666 STOP HERE -> CHECK WARNING
+# The shape survey_filter_cd contains empty units. 
+
 tm_shape(montreal_cma_ct) +
   tm_polygons(col = "beige") +
   tm_shape(montreal_cd_ct) +
