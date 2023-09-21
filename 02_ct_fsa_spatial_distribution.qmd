@@ -18,7 +18,19 @@ library(cancensus)
 library(tmap)
 library(DataExplorer)
 library(patchwork)
+library(mapview)
 ```
+
+```{r}
+# data.table optimization
+# details > https://jangorecki.gitlab.io/data.cube/library/data.table/html/datatable-optimize.html
+options(datatable.optimize=Inf)
+# notations
+`%nin%` = Negate(`%in%`)
+
+`%nlike%` = Negate(`%like%`)
+```
+
 # Read survey data
 
 ```{r}
@@ -30,17 +42,15 @@ survey_sf <- sf::st_transform(survey_sf, crs = 26918)
 
 ## Set up cancencus
 
-Set api key
+
 
 ```{r}
+# Set api key
 census_key <- data.table::fread("data/census_api_key.csv", header = F)
 census_key <- census_key %>% as_vector()
 options(cancensus.api_key = census_key)
-```
 
-Set up cache
-
-```{r}
+# Set up cache
 dir_create("./cache")
 options(cancensus.cache_path = "./cache")
 ```
@@ -86,7 +96,6 @@ montreal_cma_ct <- get_census(
   # get the associated geography in {sf} format
   geo_format = 'sf'
 ) %>% janitor::clean_names()
-
 
 
 montreal_cd_ct <- get_census(
@@ -140,6 +149,15 @@ montreal_cd_ct <- sf::st_transform(montreal_cd_ct, crs = 26918)
 # sf::st_crs(montreal_cd_ct) <- 4326
 ```
 
+### Remove NAs from age pop columns 
+```{r}
+montreal_cd_ct <- montreal_cd_ct %>% 
+  dplyr::mutate(
+    dplyr::across(age_0_14:age_65_over, ~tidyr::replace_na(.x, 0))
+  )
+```
+
+
 
 ## Buffer: Plot CT and survey data
 
@@ -151,32 +169,37 @@ cma_buff <- sf::st_buffer(montreal_cma_ct, 250)
 ```
 
 Find survey respondents that live inside Montreal (CD or CMA?).
+Spatial filtering.
 
 ```{r}
-# select geometries
-f_st_filter <- function(points_df, buff_df){
-  
-  points_df_geom <- points_df %>% select(v1, geom)
-  buff_df_geom <- buff_df %>% select(geo_uid, geometry)
-  
-  df_st_filter <- sf::st_filter(points_df_geom, buff_df_geom)
-  
-  points_df <- points_df %>% sf::st_drop_geometry()
-  
-  df_join <- left_join(points_df, df_st_filter)
-  df_join <- df_join %>% sf::st_as_sf()
-}
+## spatial filtering using `[`
+survey_filter_cd <- survey_sf[cd_buff, ]
 
-survey_filter_cd <- f_st_filter(survey_sf, cd_buff)
-
+## spatial filtering selecting geometries: st_filter works for new survey sf
+# f_st_filter <- function(points_df, buff_df){
+# 
+#   points_df_geom <- points_df %>% select(v1, geom)
+#   buff_df_geom <- buff_df %>% select(geo_uid, geometry)
+# 
+#   df_st_filter <- sf::st_filter(points_df_geom, buff_df_geom)
+# 
+#   points_df <- points_df %>% sf::st_drop_geometry()
+# 
+#   df_join <- left_join(points_df, df_st_filter)
+#   df_join <- df_join %>% sf::st_as_sf()
+# }
+# survey_filter_cd <- f_st_filter(survey_sf, cd_buff)
+## using st_filter
 # survey_filter_cd <- sf::st_filter(survey_sf, cd_buff, .predicate = st_intersects)
 
+## OBS: st_filter considers two observations (v1 %in% c(35,46)) inside the polygons (which the other methods do not consider). These observations are not within/don't intersect with the polygons. So, use `[` or lentghs(st_intersects) method
+
+## using st_intersects
 # survey_sf <- survey_sf %>% 
 #   dplyr::mutate(
 #     inside_cma = lengths(sf::st_intersects(survey_sf, cma_buff))
 #     , inside_cd = lengths(sf::st_intersects(survey_sf, cd_buff))
 #   )
-
 # filter points inside polygon
 # survey_inside_cd <- survey_sf %>%
 #   filter(inside_cd > 0)
@@ -189,8 +212,7 @@ Plot boundaries and points to check which points fall outside the 250m buffer.
 
 ```{r}
 
-66666 STOP HERE -> CHECK WARNING
-# The shape survey_filter_cd contains empty units. 
+# mapview(list(survey_filter_cd, montreal_cd_ct))
 
 tm_shape(montreal_cma_ct) +
   tm_polygons(col = "beige") +
@@ -209,14 +231,14 @@ To do so, we check if the sample *underrepresents* (i.e., has a *smaller* percen
 We need to create a category for people over 50.
 ```{r}
 # get total population sum
-cma_pop = sum(montreal_cma_ct$population, na.rm = T)
+# cma_pop = sum(montreal_cma_ct$population, na.rm = T)
 cd_pop = sum(montreal_cd_ct$population, na.rm = T)
 
-montreal_cma_ct <- montreal_cma_ct %>% 
-  dplyr::mutate(
-    age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
-    , prop_age_50_over = age_50_over / cma_pop
-  )
+# montreal_cma_ct <- montreal_cma_ct %>% 
+#   dplyr::mutate(
+#     age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
+#     , prop_age_50_over = age_50_over / cma_pop
+#   )
 
 montreal_cd_ct <- montreal_cd_ct %>% 
   dplyr::mutate(
@@ -238,9 +260,14 @@ montreal_cd_ct <- montreal_cd_ct %>%
   )
 
 # count number of points in polygons
-ptsinpoly <- st_intersects(montreal_cd_ct, survey_sf)
-montreal_cd_ct$count <- lengths(ptsinpoly)
+# ptsinpoly <- st_intersects(montreal_cd_ct, survey_sf)
+# montreal_cd_ct$count <- lengths(ptsinpoly)
 
+
+```
+
+## Plot data
+```{r}
 # plot number of survey respondents in each CT
 tm_shape(montreal_cd_ct) + 
   tm_fill(
@@ -252,25 +279,81 @@ tm_shape(montreal_cd_ct) +
 
 
 ```{r}
-montreal_cd_ct <- montreal_cd_ct %>% 
-  mutate(
-    intervals = cut(
-      prop_survey
-      , breaks = c(0, 0.003, 0.010, 0.024, 0.048, 0.146))
-    )
+# get interevals
+# tm_shape(montreal_cd_ct) +
+#   tm_fill(
+#     col = "prop_survey"
+#     , style = "jenks"
+#     # , pal=c("grey",RColorBrewer::brewer.pal(4, "YlOrBr"))
+#     )
+#
+# montreal_cd_ct <- montreal_cd_ct %>%
+#   mutate(
+#     intervals = cut(
+#       prop_survey
+#       , breaks = c(0, 0.006, 0.018, 0.036, 0.059, 0.101))
+#     )
 
-# tm_shape(montreal_cd_ct) + 
+# tm_shape(montreal_cd_ct) +
 #   tm_fill(col = "intervals", palette = "YlGnBu")
 ```
 
 
 ```{r}
 #| warning: false
+# get census natural breaks
 # plot spatial distributions
-tmct_census <- tm_shape(montreal_cd_ct) + 
-  tm_fill(col = "prop_age_50_over", style = "jenks", palette = "YlOrBr")
-tmct_survey <- tm_shape(montreal_cd_ct) + 
-  tm_fill(col = "intervals", palette = "YlOrBr", title = "prop_survey")
+montreal_cd_ct %>% 
+  mutate(prop_age_50_over = na_if(prop_age_50_over, 0L)) %>% 
+  tm_shape() + 
+  tm_polygons(
+    col = "prop_age_50_over"
+    , style = "jenks"
+    , palette = "YlOrBr"
+    , border.alpha = 0.25
+    )
+
+# cut intervals
+montreal_cd_ct <- montreal_cd_ct %>%
+   mutate(
+     intervals_age_50_over = cut(
+       prop_age_50_over
+       , breaks = c(0, 0.0001, 0.0004, 0.0007, 0.0011, 0.0016, 0.0023, Inf)
+       )
+     , intervals_survey = cut(
+       prop_survey
+       , breaks = c(0, 0.0001, 0.0004, 0.0007, 0.0011, 0.0016, 0.0023, Inf)
+       )
+     )
+
+tmct_census <- tm_shape(montreal_cd_ct) +
+   tm_polygons(
+     col = "intervals_age_50_over"
+     , palette = "YlOrBr"
+     , border.alpha = 0.25
+     , title = "prop_age_50_over"
+     )
+
+tmct_survey <- tm_shape(montreal_cd_ct) +
+   tm_polygons(
+     col = "intervals_survey"
+     , palette = "YlOrBr"
+     , border.alpha = 0.25
+     , title = "prop_survey"
+     )
+
+# tmct_survey <- montreal_cd_ct %>% 
+#   mutate(prop_survey = na_if(prop_survey, 0L)) %>% 
+#   tm_shape() + 
+#   tm_polygons(
+#     col = "prop_survey"
+#     , style = "jenks"
+#     , palette = "YlOrBr"
+#     , border.alpha = 0.25
+#     )
+# 
+# tmct_survey <- tm_shape(montreal_cd_ct) + 
+#   tm_fill(col = "intervals", palette = "YlOrBr", title = "prop_survey")
 
 # get island's centroid
 # montreal_union <- montreal_cd_ct %>% 
@@ -289,9 +372,11 @@ tmap_arrange(tmct_census, tmct_survey)
 
 
 ```{r}
-
 # compare distributions
-DataExplorer::plot_histogram(montreal_cd_ct %>% select(prop_age_50_over, prop_survey))
+DataExplorer::plot_histogram(
+  montreal_cd_ct %>% select(prop_age_50_over, prop_survey)
+  , ggtheme = hrbrthemes::theme_ipsum()
+  )
 ```
 
 
@@ -361,13 +446,13 @@ fsa_shp <- janitor::clean_names(fsa_shp)
 # select fsa from montreal chass data
 fsa_shp <- fsa_shp %>% 
   filter(cfsauid %in% unique(montreal_fsa$geouid))
-```
 
-Change crs montreal's UTM Zone 
-```{r}
+# Change crs montreal's UTM Zone 
 # utm zone for montreal: utm18 -> epsg 26918
 fsa_shp <- sf::st_transform(fsa_shp, 26918)
 ```
+
+
 
 ## Plot CT and FSA maps
 FSA map appears to contain a territorty larger than the boundaries of the island of Montreal.
@@ -411,7 +496,7 @@ cd_buff_fsa <- sf::st_buffer(fsa_shp, 250)
 Find survey respondents that live inside Montreal (CD).
 
 ```{r}
-survey_filter_cd_fsa <- sf::st_filter(survey_sf, cd_buff_fsa)
+survey_filter_cd_fsa <- survey_sf[cd_buff_fsa, ]
 ```
 
 Plot boundaries and points to check which points fall outside the 250m buffer.
@@ -449,6 +534,15 @@ montreal_fsa <- montreal_fsa %>% sf::st_as_sf()
 
 ```
 
+## Replace NA
+
+```{r}
+montreal_fsa <- montreal_fsa %>% 
+  dplyr::mutate(
+    dplyr::across(age_0_14:age_65_over, ~tidyr::replace_na(.x, 0))
+  )
+```
+
 
 ## Create categories for survey and census data at FSA level
 
@@ -459,7 +553,7 @@ cd_pop_fsa = sum(montreal_fsa$total_age, na.rm = T)
 montreal_fsa <- montreal_fsa %>% 
   dplyr::mutate(
     age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
-    , prop_age_50_over = age_50_over / cma_pop
+    , prop_age_50_over = age_50_over / cd_pop_fsa
   )
 ```
 
@@ -472,46 +566,119 @@ montreal_fsa <- montreal_fsa %>%
       ) 
     , prop_survey = count_survey / survey_size_cd
   )
-
-# plot number of survey respondents in each CT
-tm_shape(montreal_fsa) + 
-  tm_fill(
-    col = "count_survey"
-    # , style = "jenks"
-    , pal=c("grey",RColorBrewer::brewer.pal(4, "YlOrBr"))
-    )
 ```
 
+## Plot data
 ```{r}
-# get jenks natural breaks for plotting
-tm_shape(montreal_fsa) + 
+# plot number of survey respondents in each FSA
+montreal_fsa %>% 
+  mutate(count_survey = na_if(count_survey, 0L)) %>% 
+  tm_shape() +
   tm_fill(
-    col = "prop_survey"
-     , style = "jenks"
-    #, pal=c("grey",RColorBrewer::brewer.pal(4, "YlOrBr"))
-    )
-
-# create intervals for plotting
-montreal_fsa <- montreal_fsa %>% 
-  mutate(
-    intervals = cut(
-      prop_survey
-      , breaks = c(0, 0.003, 0.011, 0.024, 0.048, 0.146))
+    col = "count_survey"
+    , style = "jenks"
     )
 ```
 
 
 ```{r}
 #| warning: false
+# get census natural breaks
 # plot spatial distributions
-tmfsa_census <- tm_shape(montreal_fsa) + 
-  tm_polygons(col = "prop_age_50_over", style = "jenks", palette = "YlOrBr") +
-  tm_text("geouid", size = 0.4)
-tmfsa_survey <- tm_shape(montreal_fsa) + 
-  tm_polygons(col = "intervals", palette = "YlOrBr", title = "prop_survey") +
-  tm_text("geouid", size = 0.4)
-# tm2 <- tm_shape(montreal_cd_ct) + tm_fill(col = "prop_survey", style = "jenks") 
+montreal_fsa %>% 
+  mutate(prop_age_50_over = na_if(prop_age_50_over, 0L)) %>% 
+  tm_shape() + 
+  tm_polygons(
+    col = "prop_age_50_over"
+    , style = "jenks"
+    , palette = "YlOrBr"
+    , border.alpha = 0.25
+    )
+
+# cut intervals
+montreal_fsa <- montreal_fsa %>%
+   mutate(
+     intervals_age_50_over = cut(
+       prop_age_50_over
+       , breaks = c(0, 0.002, 0.004, 0.006, 0.007, 0.01, Inf)
+       )
+     , intervals_survey = cut(
+       prop_survey
+       , breaks = c(0, 0.002, 0.004, 0.006, 0.007, 0.01, Inf)
+       )
+     )
+
+tmfsa_census <- tm_shape(montreal_fsa) +
+   tm_polygons(
+     col = "intervals_age_50_over"
+     , palette = "YlOrBr"
+     , border.alpha = 0.25
+     , title = "prop_age_50_over"
+     )
+
+tmfsa_survey <- tm_shape(montreal_fsa) +
+   tm_polygons(
+     col = "intervals_survey"
+     , palette = "YlOrBr"
+     , border.alpha = 0.25
+     , title = "prop_survey"
+     )
+
+# tmct_survey <- montreal_cd_ct %>% 
+#   mutate(prop_survey = na_if(prop_survey, 0L)) %>% 
+#   tm_shape() + 
+#   tm_polygons(
+#     col = "prop_survey"
+#     , style = "jenks"
+#     , palette = "YlOrBr"
+#     , border.alpha = 0.25
+#     )
+# 
+# tmct_survey <- tm_shape(montreal_cd_ct) + 
+#   tm_fill(col = "intervals", palette = "YlOrBr", title = "prop_survey")
+
+# get island's centroid
+# montreal_union <- montreal_cd_ct %>% 
+#   mutate(all = "all") %>% 
+#   group_by(all) %>% 
+#   summarise() %>% 
+#   ungroup()
+# 
+# montreal_centroid <- sf::st_centroid(montreal_union)
+# 
+# tm2 <- tm2 + tm_shape(montreal_centroid) + tm_dots(size = 0.125)
+
 tmap_arrange(tmfsa_census, tmfsa_survey)
+```
+
+
+
+```{r}
+#| warning: false
+# old way
+# # plot spatial distributions
+# tmfsa_census <- montreal_fsa %>% 
+#   mutate(prop_age_50_over = dplyr::na_if(prop_age_50_over, 0L)) %>% 
+#   tm_shape() + 
+#   tm_polygons(
+#     col = "prop_age_50_over"
+#     , style = "jenks"
+#     , palette = "YlOrBr"
+#     , border.alpha = 0.25
+#     )
+# 
+# tmfsa_survey <- montreal_fsa %>% 
+#   mutate(prop_survey = na_if(prop_survey, 0L)) %>% 
+#   tm_shape() + 
+#   tm_polygons(
+#     col = "prop_survey"
+#     , style = "jenks"
+#     , palette = "YlOrBr"
+#     , border.alpha = 0.25
+#     )
+# 
+# 
+# tmap_arrange(tmfsa_census, tmfsa_survey)
 ```
 
 # Compare CT and FSA spatial distributions
@@ -529,6 +696,74 @@ tmap_save(
   )
 ```
 
+# Check flagged observations
+
+The total number of flagged observations is 15.
+The maximum frequency of flagged observations (either "FSA", which indicates that the geocoding was assigned to the centroid of the FSA, or "ParallelStreets", which indicates the middle point between the corridor provided by google) for CTs or FSA is one.
+Thus, bad geocoding or spatial clutterin of flagged observations doesn't appear to be an issue for CT or FSA.
+
+```{r}
+# Count the number of flagged observations in each CT
+montreal_cd_ct <- montreal_cd_ct %>% 
+  mutate(
+    count_flagged = lengths(
+      sf::st_intersects(
+        montreal_cd_ct
+        , survey_filter_cd %>% filter(flags %in% c("FSA", "ParallelStreets"))
+        )
+      )
+  )
+
+montreal_fsa <- montreal_fsa %>% 
+  mutate(
+    count_flagged = lengths(
+      sf::st_intersects(
+        montreal_fsa
+        , survey_filter_cd %>% filter(flags %in% c("FSA", "ParallelStreets"))
+        )
+      )
+  )
+```
+
+
+
+Plot flagged observations against 
+```{r}
+tmct_flag <- montreal_cd_ct %>% 
+  mutate(prop_survey = na_if(prop_survey, 0L)) %>% 
+  tm_shape() + 
+  tm_polygons(
+    col = "prop_survey"
+    , style = "jenks"
+    , palette = "YlOrBr"
+    , border.alpha = 0.25
+    ) +
+  tm_shape(survey_filter_cd %>% filter(flags%in% c("FSA","ParallelStreets"))) + 
+  tm_dots()
+
+tmfsa_flag <- montreal_fsa %>% 
+  mutate(prop_survey = na_if(prop_survey, 0L)) %>% 
+  tm_shape() + 
+  tm_polygons(
+    col = "prop_survey"
+    , style = "jenks"
+    , palette = "YlOrBr"
+    , border.alpha = 0.25
+    ) +
+  tm_shape(survey_filter_cd %>% filter(flags%in% c("FSA","ParallelStreets"))) + 
+  tm_dots()
+
+tm_flag <- tmap_arrange(tmct_flag, tmfsa_flag)
+
+# save map
+tmap_save(
+  tm_flag
+  , filename = "figures/flagged_ct_fsa.png"
+  # , width = 1000, height = 750, dpi = 900
+  )
+```
+
+# Under/over representation map
 
 # Save data
 
