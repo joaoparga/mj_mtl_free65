@@ -765,6 +765,71 @@ tmap_save(
 
 # Under/over representation map
 
+
+```{r}
+# create under_over column
+montreal_fsa <- montreal_fsa %>% 
+  mutate(
+    under_over = prop_survey / prop_age_50_over
+  )
+# labels category
+montreal_fsa <- montreal_fsa %>% 
+  mutate(
+    label_under_over = paste0(
+      prop_survey %>% round(3)
+      , "<br>"
+      , "("
+      , prop_age_50_over %>% round(3)
+      , ")"
+      )
+    , label_survey = as.character(prop_survey %>% round(3))
+    , label_census = paste0("(", prop_age_50_over %>% round(3), ")")
+  )
+
+
+
+```
+
+```{r}
+# plot data
+tm_shape(montreal_fsa) + 
+  tm_polygons(
+    col = "under_over"
+    , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
+    , palette = "PuOr"
+    , border.alpha = 0.25
+    , alpha = 0.95
+    , labels = c("0.00-0.50: Survey underrepresents","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Survey overrepresents')
+    , title = "Ratio: Survey/(Census)"
+    ) + 
+  tm_text(
+    text = "label_survey"
+    , size = 0.5
+    # , col = "white"
+    ) + 
+  tm_shape(montreal_fsa) +
+  tm_text(
+      text = "label_census"
+      , size = 0.5
+      , ymod = -0.25
+      # , col = "black"
+  ) +
+  tm_add_legend(
+    type = "text"
+  ) +
+  tm_layout(
+    legend.width = 2
+    , main.title = "Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
+    , main.title.position = "center"
+    , main.title.size = 1.05
+  )
+```
+
+```{r}
+
+```
+
+
 # Save data
 
 ```{r}
