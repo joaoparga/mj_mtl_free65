@@ -1,0 +1,333 @@
+---
+title: "Mobilizing Justice: Montreal Fair Pass Pilot"
+author:
+  - name: João Pedro Figueira Amorim Parga
+    orcid: 0000-0002-4105-5927
+    email: joao.parga@mail.utoronto.ca
+    affiliations:
+      - name: Mobilizing Justice Partnership
+format:
+  html:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    number_sections: true
+    code_folding: hide
+    theme: readable
+    embed-resources: true
+  pdf:
+    number-sections: true
+    colorlinks: true
+    keeptex: true
+    include-in-header: 
+      text: |
+        \usepackage{booktabs}
+        \usepackage{siunitx}
+        \newcolumntype{d}{S[
+            input-open-uncertainty=,
+            input-close-uncertainty=,
+            parse-numbers = false,
+            table-align-text-pre=false,
+            table-align-text-post=false
+         ]}
+date: 'last-modified'
+date-format: '[This version:] MMMM D, YYYY'
+abstract: 'This report provides an overview of the first wave of the Montreal Fair Pass Survey.'
+bibliography: bib/zoterolibrary_updated_10_05_23.bib
+csl: csl/american-sociological-association.csl
+tbl-cap-location: top
+number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: false
+editor:
+  mode: source
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = FALSE)
+# Use cache = TRUE if you want to speed up compilation
+
+knitr::opts_knit$set(output.format = "html")  # Set to "html" for HTML output
+
+# A function to allow for showing some of the inline code
+rinline <- function(code){
+  html <- '<code  class="r">``` `r CODE` ```</code>'
+  sub("CODE", code, html)
+}
+```
+
+```{r packages}
+#| echo: false
+#| include: false
+library(tidyverse)
+library(sf)
+library(data.table)
+library(janitor)
+library(fs)
+library(cancensus)
+library(tmap)
+library(DataExplorer)
+library(patchwork)
+library(mapview)
+```
+
+
+<!-- READ AND MANIPULATE DATA -->
+
+```{r readdata}
+#| include: false
+# montreal fsa
+montreal_fsa <- sf::st_read("data/report/montreal_fsa_count.gpkg")
+# montreal cd (ct)
+montreal_cd_ct <- sf::st_read("data/report/montreal_cd_ct_count.gpkg")
+# survey raw data
+survey_raw <- data.table::fread("data/utscfiletransfer/Montreal_Corrected_Geocoding_2023_09_18.csv")
+survey_raw <- janitor::clean_names(survey_raw)
+# survey filtered data
+survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
+```
+
+```{r createvars}
+survey_filter_cd <- survey_filter_cd %>% 
+  mutate(
+    income_midpoint = case_when(
+      q31 == "Less than $15,000" ~ 15000/2
+      , q31 == "$15,000 to $29,999 " ~ (15000 + 30000)/2
+      , q31 == "$30,000 to $59,999" ~ (30000 + 60000)/2
+      , q31 == "$60,000 to $89,999 " ~ (60000 + 90000)/2
+      , q31 == "$90,000 to $119,999 " ~ (90000 + 120000)/2
+      , q31 == "$120,000 to $149,999 " ~ (120000 + 150000)/2
+      , q31 == "$150,000 to $179,999 " ~ (150000 + 180000)/2
+      , q31 == "$180,000 to $209,999 " ~ (180000 + 210000)/2
+      , q31 == "$210,000 or more" ~ 210000
+      , .default = NA_integer_
+    )
+    , household_size = case_when(
+      q106 == "1" ~ 1
+      , q106 == "2" ~ 2
+      , q106 == "3" ~ 3
+      , q106 == "4" ~ 4
+      , q106 == "5" ~ 5
+      , q106 == "6" ~ 6
+      , q106 == "8" ~ 8
+      , q106 == "10 or more" ~ 10
+      , .default = NA_integer_
+    )
+    , gender = case_when(
+      q41 == "Man" ~ "male"
+      , q41 == "Woman" ~ "female"
+      , q41 %in% c("Non-binary", "Another gender identity, please specify:") ~ 
+        "other"
+      , .default = NA_character_
+    )
+    , age = case_when(
+      q40 == "1923 or earlier" ~ 2023L - 1923L
+      ,q40 == "1930" ~ 2023L - 1930L
+      ,q40 == "1935" ~ 2023L - 1935L
+      ,q40 == "1937" ~ 2023L - 1937L
+      ,q40 == "1938" ~ 2023L - 1938L
+      ,q40 == "1939" ~ 2023L - 1939L
+      ,q40 == "1940" ~ 2023L - 1940L
+      ,q40 == "1941" ~ 2023L - 1941L
+      ,q40 == "1942" ~ 2023L - 1942L
+      ,q40 == "1943" ~ 2023L - 1943L
+      ,q40 == "1944" ~ 2023L - 1944L
+      ,q40 == "1945" ~ 2023L - 1945L
+      ,q40 == "1946" ~ 2023L - 1946L
+      ,q40 == "1947" ~ 2023L - 1947L
+      ,q40 == "1948" ~ 2023L - 1948L
+      ,q40 == "1949" ~ 2023L - 1949L
+      ,q40 == "1950" ~ 2023L - 1950L
+      ,q40 == "1951" ~ 2023L - 1951L
+      ,q40 == "1952" ~ 2023L - 1952L
+      ,q40 == "1953" ~ 2023L - 1953L
+      ,q40 == "1954" ~ 2023L - 1954L
+      ,q40 == "1955" ~ 2023L - 1923L
+      ,q40 == "1956" ~ 2023L - 1956L
+      ,q40 == "1957" ~ 2023L - 1957L
+      ,q40 == "1958" ~ 2023L - 1958L
+      ,q40 == "1959" ~ 2023L - 1959L
+      ,q40 == "1960" ~ 2023L - 1960L
+      ,q40 == "1961" ~ 2023L - 1961L
+      ,q40 == "1962" ~ 2023L - 1962L
+      ,q40 == "1963" ~ 2023L - 1963L
+      ,q40 == "1963" ~ 2023L - 1963L
+      ,q40 == "1963" ~ 2023L - 1963L
+      ,q40 == "1963" ~ 2023L - 1963L
+      ,q40 == "1964" ~ 2023L - 1964L
+      ,q40 == "1965" ~ 2023L - 1965L
+      ,q40 == "1966" ~ 2023L - 1966L
+      ,q40 == "1967" ~ 2023L - 1967L
+      ,q40 == "1968" ~ 2023L - 1968L
+      ,q40 == "1969" ~ 2023L - 1969L
+      ,q40 == "1970" ~ 2023L - 1970L
+      ,q40 == "1971" ~ 2023L - 1971L
+      ,q40 == "1972" ~ 2023L - 1972L
+      ,q40 == "1973" ~ 2023L - 1973L
+      ,q40 == "1974 or later" ~ 2023L - 1974L
+      , .default = NA_integer_
+    )
+    # visible minority 
+    # https://www23.statcan.gc.ca/imdb/p3Var.pl?Function=DECI&Id=257515
+    , visible_minority = case_when(
+      stringr::str_detect(
+        string = q48
+        , pattern = "Southeast Asian origins|South Asian origins|Northeast Asian origins|West Asian origins|Caribbean origins|Latin, Central and South American origins|African origins|Arabic origins/North African origins") ~ "visible_minority"
+      , stringr::str_detect(
+        string = q48
+        , pattern = "Native North American origins"
+      ) ~ "native_origins"
+      , stringr::str_detect(
+        string = q48
+        , pattern = "I prefer not to answer"
+      ) ~ NA_character_
+      , .default = "not_visible_mninority"
+    )
+  )
+
+survey_filter_cd <- survey_filter_cd %>% 
+  mutate(
+    # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
+    lim_threshold = case_when(
+      household_size == 1L ~ 26503
+      , household_size == 2L ~ 37480
+      , household_size == 3L ~ 45904
+      , household_size == 4L ~ 53005
+      , household_size == 5L ~ 59261
+      , household_size == 6L ~ 64918
+      , household_size == 8L ~ 74962
+      , household_size == 10L ~ 83810
+      , .default = NA_integer_
+    )
+  )
+
+survey_filter_cd <- survey_filter_cd %>% 
+  mutate(
+    # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
+    in_lim = case_when(
+      income_midpoint < lim_threshold ~ "yes"
+      , income_midpoint >= lim_threshold ~ "no"
+      , .default = NA_character_
+    )
+  )
+```
+
+
+
+<!-- START OF THE DOCUMENT -->
+
+# Initial information
+
+The raw dataset contained `r 2 +2` observations.
+
+# Spatial distribution {#sec-spatial}
+
+Below, we plot the spatial distribution of the sample against the spatial distribution of the population over 50 years old, according to the 2021 Census.
+
+
+```{r, fig.align="center", fig.pos="H"}
+#| label: map-1-under-over-fsa
+#| fig-cap: "Under/over-representation: Ratio of the proportions of survey respondents vs. the population over 50 in each FSA (left)"
+#| out-width: 100%
+
+tm_shape(montreal_fsa) + 
+  tm_polygons(
+    col = "under_over"
+    , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
+    , palette = "BrBG"
+    , border.alpha = 0.25
+    , alpha = 0.95
+    , labels = c("0.00-0.50: Survey underrepresents","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Survey overrepresents')
+    , title = "Ratio: Survey/(Census)"
+    ) + 
+  tm_text(
+    text = "label_survey"
+    , size = 0.3
+    # , col = "white"
+    ) + 
+  tm_shape(montreal_fsa) +
+  tm_text(
+      text = "label_census"
+      , size = 0.3
+      , ymod = -0.25
+      # , col = "black"
+  ) +
+  tm_add_legend(
+    type = "text"
+  ) +
+  tm_layout(
+    legend.width = 2
+    # , main.title = "Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
+    # , main.title.position = "center"
+    # , main.title.size = 1.05
+    , legend.title.size = 1.2
+    , legend.text.size = 0.8
+  )
+
+# tmap_arrange(tm_under_over_fsa, tm_under_over_ct)
+```
+```{r, fig.align="center", fig.pos="H"}
+#| label: map-2-under-over-ct
+#| fig-cap: "Under/over-representation: Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
+#| out-width: 100%
+
+# tm_under_over_ct <- 
+  tm_shape(montreal_cd_ct) + 
+  tm_polygons(
+    col = "under_over"
+    , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
+    , palette = "BrBG"
+    , border.alpha = 0.5
+    , alpha = 0.95
+    , labels = c("0.00-0.50: Survey underrepresents","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Survey overrepresents')
+    , title = "Ratio: Survey/(Census)"
+  ) + 
+  tm_add_legend(
+    type = "text"
+  ) +
+  tm_layout(
+    legend.width = 2
+    # , main.title = "Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
+    # , main.title.position = "center"
+    # , main.title.size = 1.05
+    , legend.title.size = 1.2
+    , legend.text.size = 0.8
+  )
+
+# tmap_arrange(tm_under_over_fsa, tm_under_over_ct)
+```
+
+
+\newpage
+
+# References {.unnumbered}
+
+::: {#refs}
+:::
+
+<!--  to generate a citation entry for BibTeX, you can pass the returned object of citation() to toBibtex(), e.g. toBibtex(citation("xaringan")). Then  copy the output to a .bib file and add a unique citation key -->
+
+<!-- https://bookdown.org/yihui/rmarkdown-cookbook/write-bib.html -->
+
+\newpage
+
+# Online appendix {.unnumbered}
+
+## Attach R session info in appendix {.unnumbered}
+
+R session version and package information.
+
+```{r echo=FALSE}
+print(sessionInfo(), local = FALSE)
+```
+
+## All the code in the paper {.unnumbered}
+
+Below, all the code used in the file:
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
+

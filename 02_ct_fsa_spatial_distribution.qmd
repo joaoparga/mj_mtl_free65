@@ -43,7 +43,6 @@ survey_sf <- sf::st_transform(survey_sf, crs = 26918)
 ## Set up cancencus
 
 
-
 ```{r}
 # Set api key
 census_key <- data.table::fread("data/census_api_key.csv", header = F)
@@ -71,21 +70,80 @@ montreal_cma_ct <- get_census(
   
   # our variables of interest
   vectors = c(
-    "male_tot" = "v_CA21_9"
-    ,"female_tot" = "v_CA21_10"
-    , "age_0_14" = "v_CA21_11"
-    , "age_15_19" = "v_CA21_71"
-    , "age_20_24" = "v_CA21_89"
-    , "age_25_29" = "v_CA21_107"
-    , "age_30_34" = "v_CA21_125"
-    , "age_35_39" = "v_CA21_143"
-    , "age_40_44" = "v_CA21_161"
-    , "age_45_49" = "v_CA21_179"
-    , "age_50_54" = "v_CA21_197"
-    , "age_55_59" = "v_CA21_215"
-    , "age_60_64" = "v_CA21_233"
-    , "age_65_over" = "v_CA21_251"
-    ),
+    "total_tot" = "v_CA21_8"
+    , "male_tot" = "v_CA21_9"
+    , "female_tot" = "v_CA21_10"
+    , "age_0_14_tot" = "v_CA21_11"
+    , "age_0_14_mal" = "v_CA21_12"
+    , "age_0_14_fem" = "v_CA21_13"
+    , "age_15_19_tot" = "v_CA21_71"
+    , "age_15_19_mal" = "v_CA21_72"
+    , "age_15_19_fem" = "v_CA21_73"
+    , "age_20_24_tot" = "v_CA21_89"
+    , "age_20_24_mal" = "v_CA21_90"
+    , "age_20_24_fem" = "v_CA21_91"
+    , "age_25_29_tot" = "v_CA21_107"
+    , "age_25_29_mal" = "v_CA21_108"
+    , "age_25_29_fem" = "v_CA21_109"
+    , "age_30_34_tot" = "v_CA21_125"
+    , "age_30_34_mal" = "v_CA21_126"
+    , "age_30_34_fem" = "v_CA21_127"
+    , "age_35_39_tot" = "v_CA21_143"
+    , "age_35_39_mal" = "v_CA21_144"
+    , "age_35_39_fem" = "v_CA21_145"
+    , "age_40_44_tot" = "v_CA21_161"
+    , "age_40_44_mal" = "v_CA21_162"
+    , "age_40_44_fem" = "v_CA21_163"
+    , "age_45_49_tot" = "v_CA21_179"
+    , "age_45_49_mal" = "v_CA21_180"
+    , "age_45_49_fem" = "v_CA21_181"
+    , "age_50_54_tot" = "v_CA21_197"
+    , "age_50_54_mal" = "v_CA21_198"
+    , "age_50_54_fem" = "v_CA21_199"
+    , "age_55_59_tot" = "v_CA21_215"
+    , "age_55_59_mal" = "v_CA21_216"
+    , "age_55_59_fem" = "v_CA21_217"
+    , "age_60_64_tot" = "v_CA21_233"
+    , "age_60_64_mal" = "v_CA21_234"
+    , "age_60_64_fem" = "v_CA21_235"
+    , "age_65_over_tot" = "v_CA21_251"
+    , "age_65_over_mal" = "v_CA21_252"
+    , "age_65_over_fem" = "v_CA21_253"
+    
+    # # lim percent
+    # , "percent_lim_tot" = "v_CA21_1040" # total pop - total years - % of pop below lim
+    # , "percent_lim_mal" = "v_CA21_1041" # male pop - total years - % of pop below lim
+    # , "percent_lim_fem" = "v_CA21_1042" # female pop - total years - % of pop below lim
+    # , "percent_lim_tot_65_over" = "v_CA21_1052" # total pop - 65 and over - % of pop below lim
+    # , "percent_lim_mal_65_over" = "v_CA21_1053" # male pop - 65 and over - % of pop below lim
+    # , "percent_lim_fem_65_over" = "v_CA21_1054" # female pop - 65 and over - % of pop below lim
+    
+    # lim count
+    , "count_lim_tot_parent" = "v_CA21_1010" # total pop - total years - % of pop below lim
+    , "count_lim_mal_parent" = "v_CA21_1011" # male pop - total years - % of pop below lim
+    , "count_lim_fem_parent" = "v_CA21_1012" # female pop - total years - % of pop below lim
+    , "count_lim_tot_65_over_parent" = "v_CA21_1022" # total pop - 65 and over - % of pop below lim
+    , "count_lim_mal_65_over_parent" = "v_CA21_1023" # male pop - 65 and over - % of pop below lim
+    , "count_lim_fem_65_over_parent" = "v_CA21_1024" # female pop - 65 and over - % of pop below lim
+    
+    , "count_lim_tot_in_lim" = "v_CA21_1025" # total pop - total years - % of pop below lim
+    , "count_lim_mal_in_lim" = "v_CA21_1026" # male pop - total years - % of pop below lim
+    , "count_lim_fem_in_lim" = "v_CA21_1027" # female pop - total years - % of pop below lim
+    , "count_lim_tot_65_over_in_lim" = "v_CA21_1037" # total pop - 65 and over - % of pop below lim
+    , "count_lim_mal_65_over_in_lim" = "v_CA21_1038" # male pop - 65 and over - % of pop below lim
+    , "count_lim_fem_65_over_in_lim" = "v_CA21_1039" # female pop - 65 and over - % of pop below lim
+
+    
+    # vis minority
+    , "tot_vis_minority_tot_parent" = "v_CA21_4872"
+    , "tot_vis_minority_mal_parent" = "v_CA21_4873"
+    , "tot_vis_minority_fem_parent" = "v_CA21_4874"
+    
+    , "tot_vis_minority_tot" = "v_CA21_4875"
+    , "tot_vis_minority_mal" = "v_CA21_4876"
+    , "tot_vis_minority_fem" = "v_CA21_4877"
+    
+  ),
   
   # census DA geography
   level = 'CT',
@@ -111,21 +169,80 @@ montreal_cd_ct <- get_census(
   
   # our variables of interest
   vectors = c(
-    "male_tot" = "v_CA21_9"
-    ,"female_tot" = "v_CA21_10"
-    , "age_0_14" = "v_CA21_11"
-    , "age_15_19" = "v_CA21_71"
-    , "age_20_24" = "v_CA21_89"
-    , "age_25_29" = "v_CA21_107"
-    , "age_30_34" = "v_CA21_125"
-    , "age_35_39" = "v_CA21_143"
-    , "age_40_44" = "v_CA21_161"
-    , "age_45_49" = "v_CA21_179"
-    , "age_50_54" = "v_CA21_197"
-    , "age_55_59" = "v_CA21_215"
-    , "age_60_64" = "v_CA21_233"
-    , "age_65_over" = "v_CA21_251"
-    ),
+    "total_tot" = "v_CA21_8"
+    , "male_tot" = "v_CA21_9"
+    , "female_tot" = "v_CA21_10"
+    , "age_0_14_tot" = "v_CA21_11"
+    , "age_0_14_mal" = "v_CA21_12"
+    , "age_0_14_fem" = "v_CA21_13"
+    , "age_15_19_tot" = "v_CA21_71"
+    , "age_15_19_mal" = "v_CA21_72"
+    , "age_15_19_fem" = "v_CA21_73"
+    , "age_20_24_tot" = "v_CA21_89"
+    , "age_20_24_mal" = "v_CA21_90"
+    , "age_20_24_fem" = "v_CA21_91"
+    , "age_25_29_tot" = "v_CA21_107"
+    , "age_25_29_mal" = "v_CA21_108"
+    , "age_25_29_fem" = "v_CA21_109"
+    , "age_30_34_tot" = "v_CA21_125"
+    , "age_30_34_mal" = "v_CA21_126"
+    , "age_30_34_fem" = "v_CA21_127"
+    , "age_35_39_tot" = "v_CA21_143"
+    , "age_35_39_mal" = "v_CA21_144"
+    , "age_35_39_fem" = "v_CA21_145"
+    , "age_40_44_tot" = "v_CA21_161"
+    , "age_40_44_mal" = "v_CA21_162"
+    , "age_40_44_fem" = "v_CA21_163"
+    , "age_45_49_tot" = "v_CA21_179"
+    , "age_45_49_mal" = "v_CA21_180"
+    , "age_45_49_fem" = "v_CA21_181"
+    , "age_50_54_tot" = "v_CA21_197"
+    , "age_50_54_mal" = "v_CA21_198"
+    , "age_50_54_fem" = "v_CA21_199"
+    , "age_55_59_tot" = "v_CA21_215"
+    , "age_55_59_mal" = "v_CA21_216"
+    , "age_55_59_fem" = "v_CA21_217"
+    , "age_60_64_tot" = "v_CA21_233"
+    , "age_60_64_mal" = "v_CA21_234"
+    , "age_60_64_fem" = "v_CA21_235"
+    , "age_65_over_tot" = "v_CA21_251"
+    , "age_65_over_mal" = "v_CA21_252"
+    , "age_65_over_fem" = "v_CA21_253"
+    
+    # # lim percent
+    # , "percent_lim_tot" = "v_CA21_1040" # total pop - total years - % of pop below lim
+    # , "percent_lim_mal" = "v_CA21_1041" # male pop - total years - % of pop below lim
+    # , "percent_lim_fem" = "v_CA21_1042" # female pop - total years - % of pop below lim
+    # , "percent_lim_tot_65_over" = "v_CA21_1052" # total pop - 65 and over - % of pop below lim
+    # , "percent_lim_mal_65_over" = "v_CA21_1053" # male pop - 65 and over - % of pop below lim
+    # , "percent_lim_fem_65_over" = "v_CA21_1054" # female pop - 65 and over - % of pop below lim
+    
+    # lim count
+    , "count_lim_tot_parent" = "v_CA21_1010" # total pop - total years - % of pop below lim
+    , "count_lim_mal_parent" = "v_CA21_1011" # male pop - total years - % of pop below lim
+    , "count_lim_fem_parent" = "v_CA21_1012" # female pop - total years - % of pop below lim
+    , "count_lim_tot_65_over_parent" = "v_CA21_1022" # total pop - 65 and over - % of pop below lim
+    , "count_lim_mal_65_over_parent" = "v_CA21_1023" # male pop - 65 and over - % of pop below lim
+    , "count_lim_fem_65_over_parent" = "v_CA21_1024" # female pop - 65 and over - % of pop below lim
+    
+    , "count_lim_tot_in_lim" = "v_CA21_1025" # total pop - total years - % of pop below lim
+    , "count_lim_mal_in_lim" = "v_CA21_1026" # male pop - total years - % of pop below lim
+    , "count_lim_fem_in_lim" = "v_CA21_1027" # female pop - total years - % of pop below lim
+    , "count_lim_tot_65_over_in_lim" = "v_CA21_1037" # total pop - 65 and over - % of pop below lim
+    , "count_lim_mal_65_over_in_lim" = "v_CA21_1038" # male pop - 65 and over - % of pop below lim
+    , "count_lim_fem_65_over_in_lim" = "v_CA21_1039" # female pop - 65 and over - % of pop below lim
+
+    
+    # vis minority
+    , "tot_vis_minority_tot_parent" = "v_CA21_4872"
+    , "tot_vis_minority_mal_parent" = "v_CA21_4873"
+    , "tot_vis_minority_fem_parent" = "v_CA21_4874"
+    
+    , "tot_vis_minority_tot" = "v_CA21_4875"
+    , "tot_vis_minority_mal" = "v_CA21_4876"
+    , "tot_vis_minority_fem" = "v_CA21_4877"
+    
+  ),
   
   # census DA geography
   level = 'CT',
@@ -149,11 +266,11 @@ montreal_cd_ct <- sf::st_transform(montreal_cd_ct, crs = 26918)
 # sf::st_crs(montreal_cd_ct) <- 4326
 ```
 
-### Remove NAs from age pop columns 
+### Remove NAs from age population columns 
 ```{r}
 montreal_cd_ct <- montreal_cd_ct %>% 
   dplyr::mutate(
-    dplyr::across(age_0_14:age_65_over, ~tidyr::replace_na(.x, 0))
+    dplyr::across(total_tot:tot_vis_minority_fem, ~tidyr::replace_na(.x, 0))
   )
 ```
 
@@ -236,13 +353,13 @@ cd_pop = sum(montreal_cd_ct$population, na.rm = T)
 
 # montreal_cma_ct <- montreal_cma_ct %>% 
 #   dplyr::mutate(
-#     age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
+#     age_50_over = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
 #     , prop_age_50_over = age_50_over / cma_pop
 #   )
 
 montreal_cd_ct <- montreal_cd_ct %>% 
   dplyr::mutate(
-    age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
+    age_50_over = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
     , prop_age_50_over = age_50_over / cd_pop
   )
 ```
@@ -414,18 +531,18 @@ data.table::setnames(
     , "fsa_name"
     , "population_2021"
     , "total_age"
-    , "age_0_14"
-    , "age_15_19"
-    , "age_20_24"
-    , "age_25_29"
-    , "age_30_34"
-    , "age_35_39"
-    , "age_40_44"
-    , "age_45_49"
-    , "age_50_54"
-    , "age_55_59"
-    , "age_60_64"
-    , "age_65_over"
+    , "age_0_14_tot"
+    , "age_15_19_tot"
+    , "age_20_24_tot"
+    , "age_25_29_tot"
+    , "age_30_34_tot"
+    , "age_35_39_tot"
+    , "age_40_44_tot"
+    , "age_45_49_tot"
+    , "age_50_54_tot"
+    , "age_55_59_tot"
+    , "age_60_64_tot"
+    , "age_65_over_tot"
   )
 )
 ```
@@ -539,7 +656,7 @@ montreal_fsa <- montreal_fsa %>% sf::st_as_sf()
 ```{r}
 montreal_fsa <- montreal_fsa %>% 
   dplyr::mutate(
-    dplyr::across(age_0_14:age_65_over, ~tidyr::replace_na(.x, 0))
+    dplyr::across(age_0_14_tot:age_65_over_tot, ~tidyr::replace_na(.x, 0))
   )
 ```
 
@@ -552,7 +669,7 @@ cd_pop_fsa = sum(montreal_fsa$total_age, na.rm = T)
 
 montreal_fsa <- montreal_fsa %>% 
   dplyr::mutate(
-    age_50_over = age_50_54 + age_55_59 + age_60_64 + age_65_over
+    age_50_over = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
     , prop_age_50_over = age_50_over / cd_pop_fsa
   )
 ```
@@ -767,15 +884,15 @@ tmap_save(
 
 
 ```{r}
-# create under_over column
-montreal_fsa <- montreal_fsa %>% 
-  mutate(
-    under_over = prop_survey / prop_age_50_over
-  )
-# labels category
-montreal_fsa <- montreal_fsa %>% 
-  mutate(
-    label_under_over = paste0(
+f_under_over <- function(df){
+  df <- df %>% 
+    # create under_over var
+    mutate(under_over = prop_survey / prop_age_50_over)
+  
+    # create labels
+  df <- df %>% 
+    mutate(
+      label_under_over = paste0(
       prop_survey %>% round(3)
       , "<br>"
       , "("
@@ -784,9 +901,12 @@ montreal_fsa <- montreal_fsa %>%
       )
     , label_survey = as.character(prop_survey %>% round(3))
     , label_census = paste0("(", prop_age_50_over %>% round(3), ")")
-  )
+    )
+  
+}
 
-
+montreal_cd_ct <- f_under_over(montreal_cd_ct)
+montreal_fsa <- f_under_over(montreal_fsa)
 
 ```
 
@@ -833,6 +953,8 @@ tm_shape(montreal_fsa) +
 # Save data
 
 ```{r}
-
-
+sf::st_write(montreal_cd_ct, "data/report/montreal_cd_ct_count.gpkg", append = F)
+sf::st_write(montreal_fsa, "data/report/montreal_fsa_count.gpkg", append = F)
+sf::st_write(survey_filter_cd_fsa, "data/report/survey_filter_inside_cd.gpkg",
+             append = F)
 ```
