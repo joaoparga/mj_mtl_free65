@@ -331,12 +331,34 @@ We need to create a category for people over 50.
 
 ```{r}
 # get total population sum
-cd_pop = sum(montreal_cd_ct$total_tot, na.rm = T)
+cd_pop_total_tot = sum(montreal_cd_ct$total_tot, na.rm = T)
 
 montreal_cd_ct <- montreal_cd_ct %>% 
   dplyr::mutate(
-    age_50_over = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
-    , prop_age_50_over = age_50_over / cd_pop
+    # SUMS
+    # 50 and over
+    age_50_over_tot = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
+    , age_50_over_mal = age_50_54_mal + age_55_59_mal + age_60_64_mal + age_65_over_mal
+    , age_50_over_fem = age_50_54_fem + age_55_59_fem + age_60_64_fem + age_65_over_fem
+    # control
+    , age_50_64_tot = age_50_54_tot + age_55_59_tot + age_60_64_tot
+    , age_50_64_mal = age_50_54_mal + age_55_59_mal + age_60_64_mal
+    , age_50_64_fem = age_50_54_fem + age_55_59_fem + age_60_64_fem
+    # treatment -> already defined
+    
+    # PROPORTIONS 
+    , prop_age_50_over_tot = age_50_over_tot / cd_pop_total_tot
+    , prop_age_50_over_mal = age_50_over_mal / cd_pop_total_tot
+    , prop_age_50_over_fem = age_50_over_fem / cd_pop_total_tot
+    
+    # control
+    , prop_age_50_64_tot = age_50_64_tot / cd_pop_total_tot
+    , prop_age_50_64_mal = age_50_64_mal / cd_pop_total_tot
+    , prop_age_50_64_fem = age_50_64_fem / cd_pop_total_tot
+    # treatment
+    , prop_age_65_over_tot = age_65_over_tot / cd_pop_total_tot
+    , prop_age_65_over_mal = age_65_over_mal / cd_pop_total_tot
+    , prop_age_65_over_fem = age_65_over_fem / cd_pop_total_tot
   )
 ```
 
@@ -386,10 +408,10 @@ montreal_cd_ct <- montreal_cd_ct %>%
 # get census natural breaks
 # plot spatial distributions
 montreal_cd_ct %>% 
-  mutate(prop_age_50_over = na_if(prop_age_50_over, 0L)) %>% 
+  mutate(prop_age_65_over_tot = na_if(prop_age_65_over_tot, 0L)) %>% 
   tm_shape() + 
   tm_polygons(
-    col = "prop_age_50_over"
+    col = "prop_age_65_over_tot"
     , style = "jenks"
     , palette = "YlOrBr"
     , border.alpha = 0.25
@@ -399,7 +421,7 @@ montreal_cd_ct %>%
 montreal_cd_ct <- montreal_cd_ct %>%
    mutate(
      intervals_age_50_over = cut(
-       prop_age_50_over
+       prop_age_65_over_tot
        , breaks = c(0, 0.0001, 0.0004, 0.0007, 0.0011, 0.0016, 0.0023, Inf)
        )
      , intervals_survey = cut(
@@ -413,7 +435,7 @@ tmct_census <- tm_shape(montreal_cd_ct) +
      col = "intervals_age_50_over"
      , palette = "YlOrBr"
      , border.alpha = 0.25
-     , title = "prop_age_50_over"
+     , title = "prop_age_65_over_tot"
      )
 
 tmct_survey <- tm_shape(montreal_cd_ct) +
@@ -454,7 +476,7 @@ tmap_arrange(tmct_census, tmct_survey)
 ```{r}
 # compare distributions
 DataExplorer::plot_histogram(
-  montreal_cd_ct %>% select(prop_age_50_over, prop_survey)
+  montreal_cd_ct %>% select(prop_age_65_over_tot, prop_survey)
   , ggtheme = hrbrthemes::theme_ipsum()
   )
 ```
@@ -609,8 +631,8 @@ cd_pop_fsa = sum(montreal_fsa$total_age, na.rm = T)
 
 montreal_fsa <- montreal_fsa %>% 
   dplyr::mutate(
-    age_50_over = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
-    , prop_age_50_over = age_50_over / cd_pop_fsa
+    age_50_over_tot = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
+    , prop_age_65_over_tot = age_50_over_tot / cd_pop_fsa
   )
 ```
 
@@ -632,10 +654,10 @@ montreal_fsa <- montreal_fsa %>%
 # get census natural breaks
 # plot spatial distributions
 montreal_fsa %>% 
-  mutate(prop_age_50_over = na_if(prop_age_50_over, 0L)) %>% 
+  mutate(prop_age_65_over_tot = na_if(prop_age_65_over_tot, 0L)) %>% 
   tm_shape() + 
   tm_polygons(
-    col = "prop_age_50_over"
+    col = "prop_age_65_over_tot"
     , style = "jenks"
     , palette = "YlOrBr"
     , border.alpha = 0.25
@@ -645,7 +667,7 @@ montreal_fsa %>%
 montreal_fsa <- montreal_fsa %>%
    mutate(
      intervals_age_50_over = cut(
-       prop_age_50_over
+       prop_age_65_over_tot
        , breaks = c(0, 0.002, 0.004, 0.006, 0.007, 0.01, Inf)
        )
      , intervals_survey = cut(
@@ -659,7 +681,7 @@ tmfsa_census <- tm_shape(montreal_fsa) +
      col = "intervals_age_50_over"
      , palette = "YlOrBr"
      , border.alpha = 0.25
-     , title = "prop_age_50_over"
+     , title = "prop_age_65_over_tot"
      )
 
 tmfsa_survey <- tm_shape(montreal_fsa) +
@@ -704,10 +726,10 @@ tmap_arrange(tmfsa_census, tmfsa_survey)
 # old way
 # # plot spatial distributions
 # tmfsa_census <- montreal_fsa %>% 
-#   mutate(prop_age_50_over = dplyr::na_if(prop_age_50_over, 0L)) %>% 
+#   mutate(prop_age_65_over_tot = dplyr::na_if(prop_age_65_over_tot, 0L)) %>% 
 #   tm_shape() + 
 #   tm_polygons(
-#     col = "prop_age_50_over"
+#     col = "prop_age_65_over_tot"
 #     , style = "jenks"
 #     , palette = "YlOrBr"
 #     , border.alpha = 0.25
@@ -815,7 +837,7 @@ tmap_save(
 f_under_over <- function(df){
   df <- df %>% 
     # create under_over var
-    mutate(under_over = prop_survey / prop_age_50_over)
+    mutate(under_over = prop_survey / prop_age_65_over_tot)
   
     # create labels
   df <- df %>% 
@@ -824,11 +846,11 @@ f_under_over <- function(df){
       prop_survey %>% round(3)
       , "<br>"
       , "("
-      , prop_age_50_over %>% round(3)
+      , prop_age_65_over_tot %>% round(3)
       , ")"
       )
     , label_survey = as.character(prop_survey %>% round(3))
-    , label_census = paste0("(", prop_age_50_over %>% round(3), ")")
+    , label_census = paste0("(", prop_age_65_over_tot %>% round(3), ")")
     )
 }
 

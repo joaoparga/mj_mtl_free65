@@ -51,6 +51,15 @@ survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
 
 ```
 
+```{r readtranslateddata}
+df_translated_q45_21 <- data.table::fread("data/translated_q45_21.csv")
+```
+
+```{r jointranslateddata}
+survey_filter_cd <- survey_filter_cd %>% 
+  dplyr::left_join(df_translated_q45_21 %>% select(-q45_21_text), by = "v1")
+```
+
 
 ```{r createvars}
 pattern_vis_minority_q48 <- "Southeast Asian origins|South Asian origins|Northeast Asian origins|West Asian origins|Caribbean origins|Latin, Central and South American origins|African origins|Arabic origins/North African origins"
@@ -84,16 +93,36 @@ survey_filter_cd <- survey_filter_cd %>%
       , q106 == "10 or more" ~ 10
       , .default = NA_integer_
     )
+    # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
+    # before tax threshold
+    , lim_threshold = case_when(
+      household_size == 1L ~ 30401
+      , household_size == 2L ~ 42993
+      , household_size == 3L ~ 52655
+      , household_size == 4L ~ 60801
+      , household_size == 5L ~ 67978
+      , household_size == 6L ~ 74466
+      , household_size == 8L ~ 85987
+      , household_size == 10L ~ 96136
+      , .default = NA_integer_
+    )
+    # in lim
+    # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
+    , in_lim = case_when(
+      income_midpoint < lim_threshold ~ "yes"
+      , income_midpoint >= lim_threshold ~ "no"
+      , .default = NA_character_
+    )
     # gender
-    , gender = case_when(
+    , gender = as_factor(case_when(
       q41 == "Man" ~ "male"
       , q41 == "Woman" ~ "female"
       , q41 %in% c("Non-binary", "Another gender identity, please specify:") ~ 
         "other"
       , .default = NA_character_
-    )
-    # age integer
-    , age = case_when(
+    ))
+    # age raw
+    , age_raw = case_when(
       q40 == "1923 or earlier" ~ 2023L - 1923L
       ,q40 == "1930" ~ 2023L - 1930L
       ,q40 == "1935" ~ 2023L - 1935L
@@ -115,7 +144,7 @@ survey_filter_cd <- survey_filter_cd %>%
       ,q40 == "1952" ~ 2023L - 1952L
       ,q40 == "1953" ~ 2023L - 1953L
       ,q40 == "1954" ~ 2023L - 1954L
-      ,q40 == "1955" ~ 2023L - 1923L
+      ,q40 == "1955" ~ 2023L - 1955L
       ,q40 == "1956" ~ 2023L - 1956L
       ,q40 == "1957" ~ 2023L - 1957L
       ,q40 == "1958" ~ 2023L - 1958L
@@ -123,9 +152,6 @@ survey_filter_cd <- survey_filter_cd %>%
       ,q40 == "1960" ~ 2023L - 1960L
       ,q40 == "1961" ~ 2023L - 1961L
       ,q40 == "1962" ~ 2023L - 1962L
-      ,q40 == "1963" ~ 2023L - 1963L
-      ,q40 == "1963" ~ 2023L - 1963L
-      ,q40 == "1963" ~ 2023L - 1963L
       ,q40 == "1963" ~ 2023L - 1963L
       ,q40 == "1964" ~ 2023L - 1964L
       ,q40 == "1965" ~ 2023L - 1965L
@@ -140,9 +166,34 @@ survey_filter_cd <- survey_filter_cd %>%
       ,q40 == "1974 or later" ~ 2023L - 1974L
       , .default = NA_integer_
     )
+    # age corrected
+    , age_corrected = case_when(
+      # q4 == "50-64" & age_raw == 65L ~ 64L
+        q4 == "50-64" & q40 == "1974 or later" ~ 50L
+      , q4 == "65 and older" & q40 == "1974 or later" ~ 50L
+      , q4 == "50-64" & q40 == "1958" ~ 64L
+      , .default = age_raw
+    )
+    # age categories
+    , age_groups_5 = case_when(
+      age_corrected < 50L ~ "age_less_50"
+      , age_corrected >= 50L & age_corrected <= 54L ~ "age_50_54"
+      , age_corrected >= 55L & age_corrected <= 59L ~ "age_55_59"
+      , age_corrected >= 60L & age_corrected <= 64L ~ "age_60_64"
+      , age_corrected >= 65 ~ "age_65_over" 
+      , .default = NA_character_
+    )
+    , age_groups_control_treat = case_when(
+      age_corrected < 50L ~ "age_less_50"
+      , age_corrected >= 50L & age_corrected <= 64L ~ "age_50_64"
+      , age_corrected >= 65 ~ "age_65_over" 
+      , q40 == "Prefer not to answer" & q4 == "50-64" ~ "age_50_64"
+      , q40 == "Prefer not to answer" & q4 == "65 and older" ~ "age_65_over"
+      , .default = NA_character_
+    )
     # visible minority 
     # https://www23.statcan.gc.ca/imdb/p3Var.pl?Function=DECI&Id=257515
-    , visible_minority = case_when(
+    , visible_minority = as_factor(case_when(
       stringr::str_detect(
         string = q48
         , pattern = pattern_vis_minority_q48
@@ -160,58 +211,87 @@ survey_filter_cd <- survey_filter_cd %>%
         , pattern = "I prefer not to answer"
       ) ~ NA_character_
       , .default = "not_visible_minority"
-    )
+    ))
     , educ_has_postsec = as_factor(case_when(
-      q9_5 %in% c(
-        "College or trade school\t\t"
-        , "CEGEP"
-        , "Bachelor’s degree"
-        , "Master’s degree or doctorate"
-        ) ~ 'yes'
-      , q9_5 %in% c("Primary school\t","High school") ~ "no"
-      T ~ NA_character_
+      str_detect(string = q43 , pattern = "College|CEGEP|Bachelor|Master") ~
+        "yes"
+      , str_detect(string = q43 , pattern = "Primary|High") ~
+        "no"
+      , T ~ NA_character_
+    ))
+    , vehicles_per_capita = case_when(
+      q39 == "0" ~ 0
+      , q39 == "1" ~ 1/household_size
+      , q39 == "2" ~ 2/household_size
+      , q39 == "3" ~ 3/household_size
+      , q39 == "4+" ~ 4/household_size
+      , .default = NA_integer_
+    )
+    , lone_household = as_factor(case_when(
+      q42 == "" ~ "yes"
+      , q42 == "Prefer not to answer" ~ NA_character_
+      , .default = "no"
+    ))
+    , employment = as_factor(case_when(
+      str_detect(string = q45, pattern = "Unemployed") ~ "Unemployed"
+      , str_detect(string = q45, pattern = "part-time") ~ "Employed part-time"
+      , str_detect(string = q45, pattern = "Retired") ~ "Retired"
+      , str_detect(string = q45, pattern = "full-time") |
+        str_detect(string = q45_21_trans, pattern = "Self-employed")
+        ~ "Employed full-time"
+      , str_detect(string = q45, pattern = "Prefer not to answer/I don’t know") ~ NA_character_
+      , .default = "Other"
+    ))
+    , employed = as_factor(case_when(
+      str_detect(string = q45, pattern = "(part|full)-time") |
+        # double check later
+        str_detect(string = q45_21_trans, pattern = "Self-employed|full-time|Work and retirement|Semi-retired") ~ "yes"
+      , str_detect(string = q45, pattern = "Prefer not to answer/I don’t know") ~ NA_character_
+      , .default = "no"
+    ))
+    , unemployed = as_factor(case_when(
+      str_detect(string = q45, pattern = "Unemployed") ~ "Unemployed"
+      , str_detect(string = q45, pattern = "Prefer not to answer/I don’t know") ~ NA_character_
+      , .default = "Other"
+    ))
+    , immigrant = as_factor(case_when(
+      q79 == "Born here " ~ "no"
+      , q79 == "Prefer not to answer" ~ NA_character_
+      , .default = "yes"
+    ))
+    , any_functional_limitation = as_factor(case_when(
+      str_detect(string = q80, pattern = "No, I don’t have any") ~ "no"
+      , str_detect(string = q80, pattern = "I prefer not to answer") ~ NA_character_
+      , .default = "yes"
+    ))
+    , any_mobility_limitation = as_factor(case_when(
+      str_detect(string = q80, pattern = "Mobility") ~ "yes"
+      , str_detect(string = q80, pattern = "I prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , firstnations_metis_inuit = as_factor(case_when(
+      q47 == "No" ~ "no"
+      , q47 == "Prefer not to answer" ~ NA_character_
+      , .default = "yes"
+    ))
+    , transit_once_week_plus = as_factor(case_when(
+      q3 %in% c("1-2 days a week"
+                , "3-4 days a week"
+                , "5-7 days a week") ~ "yes"
+      , q3 == "Not Asked" ~ NA_character_
+      , .default = "no"
+    ))
+    , transit_last_week = as_factor(case_when(
+      str_detect(string = q21, pattern = "(B|b)us|rail|Metro|Paratransit") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
     ))
   )
 
-# age categories
-survey_filter_cd <- survey_filter_cd %>% 
-  mutate(
-    age_groups = case_when(
-      age < 50L ~ "age_less_50"
-      , age >= 50L & age <= 54L ~ "age_50_54"
-      , age >= 55L & age <= 59L ~ "age_55_59"
-      , age >= 60L & age <= 64L ~ "age_60_64"
-      , age >= 65 ~ "age_65_over" 
-      , .default = NA_character_
-    )
-  )
+```
 
-survey_filter_cd <- survey_filter_cd %>% 
-  mutate(
-    # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
-    # before tax threshold
-    lim_threshold = case_when(
-        household_size == 1L ~ 30401
-      , household_size == 2L ~ 42993
-      , household_size == 3L ~ 52655
-      , household_size == 4L ~ 60801
-      , household_size == 5L ~ 67978
-      , household_size == 6L ~ 74466
-      , household_size == 8L ~ 85987
-      , household_size == 10L ~ 96136
-      , .default = NA_integer_
-    )
-  )
+```{r factorrelevel}
 
-survey_filter_cd <- survey_filter_cd %>% 
-  mutate(
-    # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
-    in_lim = case_when(
-      income_midpoint < lim_threshold ~ "yes"
-      , income_midpoint >= lim_threshold ~ "no"
-      , .default = NA_character_
-    )
-  )
 ```
 
 
