@@ -61,7 +61,7 @@ survey_filter_cd <- survey_filter_cd %>%
 ```
 
 
-```{r createvars}
+```{r createvarsdemographics}
 pattern_vis_minority_q48 <- "Southeast Asian origins|South Asian origins|Northeast Asian origins|West Asian origins|Caribbean origins|Latin, Central and South American origins|African origins|Arabic origins/North African origins"
 
 pattern_vis_minority_q48_28_text <- "Arabe d’Egypte|Egyptian|Kabyle|Lebanese|Libanais|Libanaise|Philippines"
@@ -227,9 +227,10 @@ survey_filter_cd <- survey_filter_cd %>%
       , q39 == "4+" ~ 4/household_size
       , .default = NA_integer_
     )
+    # check if "" means skipped or 
     , lone_household = as_factor(case_when(
-      q42 == "" ~ "yes"
-      , q42 == "Prefer not to answer" ~ NA_character_
+      household_size == 1 ~ "yes"
+      , is.na(household_size) ~ NA_character_
       , .default = "no"
     ))
     , employment = as_factor(case_when(
@@ -274,21 +275,55 @@ survey_filter_cd <- survey_filter_cd %>%
       , q47 == "Prefer not to answer" ~ NA_character_
       , .default = "yes"
     ))
-    , transit_once_week_plus = as_factor(case_when(
+  )
+
+```
+
+```{r correctmissingcoding}
+survey_filter_cd <- survey_filter_cd %>% 
+  mutate(
+    across(q22_1:q96_10, ~dplyr::na_if(., -99L))
+  )
+```
+
+
+```{r createvarstravelbehaviour}
+survey_filter_cd <- survey_filter_cd %>% 
+  mutate(
+      transit_once_week_plus = as_factor(case_when(
       q3 %in% c("1-2 days a week"
                 , "3-4 days a week"
                 , "5-7 days a week") ~ "yes"
       , q3 == "Not Asked" ~ NA_character_
       , .default = "no"
     ))
-    , transit_last_week = as_factor(case_when(
+    , last_7_mode_transit = as_factor(case_when(
       str_detect(string = q21, pattern = "(B|b)us|rail|Metro|Paratransit") ~ "yes"
       , q21 == "" ~ NA_character_
       , .default = "no"
     ))
+    , last_7_mode_car = as_factor(case_when(
+      str_detect(string = q21, pattern = "Own car|Carpooling|Carsharing") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_mode_active = as_factor(case_when(
+      str_detect(string = q21, pattern = "Walking|Own bike|Self-service bike") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , 
   )
+```
+
+```{r countmostusedmode}
 
 ```
+
+```{r transitmaindestination}
+
+```
+
 
 ```{r factorrelevel}
 
