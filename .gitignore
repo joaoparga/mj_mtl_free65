@@ -52,6 +52,6 @@ data/
 cache/
 .DS_Store
 jp_api_cancencus.csv
-
+translate_key.csv
 bib/
 csl/

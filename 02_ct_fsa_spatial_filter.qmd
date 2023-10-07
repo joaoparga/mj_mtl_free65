@@ -1,5 +1,5 @@
 ---
-title: "01_geocode_data"
+title: "02_ct_fsa_spatial_filter"
 format: html
 editor: source
 ---
@@ -7,8 +7,7 @@ editor: source
 # Setup
 
 ```{r}
-#| echo: false
-#| warning: false
+#| include: false
 library(tidyverse)
 library(sf)
 library(data.table)
@@ -56,106 +55,100 @@ options(cancensus.cache_path = "./cache")
 
 ## Download census data
 
-```{r}
-montreal_cma_ct <- get_census(
-  # 2021 census
-  dataset = 'CA21', 
-  
-  # toronto is CMA code 535; oshawa 532
-  regions = list(
-    CMA = c("24462") # metro -> necessary for plotting all the data
-    # CD = c("2466") # regional district
-    # CSD = c("2466023") # city
-    ),
-  
-  # our variables of interest
-  vectors = c(
-    "total_tot" = "v_CA21_8"
-    , "male_tot" = "v_CA21_9"
-    , "female_tot" = "v_CA21_10"
-    , "age_0_14_tot" = "v_CA21_11"
-    , "age_0_14_mal" = "v_CA21_12"
-    , "age_0_14_fem" = "v_CA21_13"
-    , "age_15_19_tot" = "v_CA21_71"
-    , "age_15_19_mal" = "v_CA21_72"
-    , "age_15_19_fem" = "v_CA21_73"
-    , "age_20_24_tot" = "v_CA21_89"
-    , "age_20_24_mal" = "v_CA21_90"
-    , "age_20_24_fem" = "v_CA21_91"
-    , "age_25_29_tot" = "v_CA21_107"
-    , "age_25_29_mal" = "v_CA21_108"
-    , "age_25_29_fem" = "v_CA21_109"
-    , "age_30_34_tot" = "v_CA21_125"
-    , "age_30_34_mal" = "v_CA21_126"
-    , "age_30_34_fem" = "v_CA21_127"
-    , "age_35_39_tot" = "v_CA21_143"
-    , "age_35_39_mal" = "v_CA21_144"
-    , "age_35_39_fem" = "v_CA21_145"
-    , "age_40_44_tot" = "v_CA21_161"
-    , "age_40_44_mal" = "v_CA21_162"
-    , "age_40_44_fem" = "v_CA21_163"
-    , "age_45_49_tot" = "v_CA21_179"
-    , "age_45_49_mal" = "v_CA21_180"
-    , "age_45_49_fem" = "v_CA21_181"
-    , "age_50_54_tot" = "v_CA21_197"
-    , "age_50_54_mal" = "v_CA21_198"
-    , "age_50_54_fem" = "v_CA21_199"
-    , "age_55_59_tot" = "v_CA21_215"
-    , "age_55_59_mal" = "v_CA21_216"
-    , "age_55_59_fem" = "v_CA21_217"
-    , "age_60_64_tot" = "v_CA21_233"
-    , "age_60_64_mal" = "v_CA21_234"
-    , "age_60_64_fem" = "v_CA21_235"
-    , "age_65_over_tot" = "v_CA21_251"
-    , "age_65_over_mal" = "v_CA21_252"
-    , "age_65_over_fem" = "v_CA21_253"
-    
-    # # lim percent
-    # , "percent_lim_tot" = "v_CA21_1040" # total pop - total years - % of pop below lim
-    # , "percent_lim_mal" = "v_CA21_1041" # male pop - total years - % of pop below lim
-    # , "percent_lim_fem" = "v_CA21_1042" # female pop - total years - % of pop below lim
-    # , "percent_lim_tot_65_over" = "v_CA21_1052" # total pop - 65 and over - % of pop below lim
-    # , "percent_lim_mal_65_over" = "v_CA21_1053" # male pop - 65 and over - % of pop below lim
-    # , "percent_lim_fem_65_over" = "v_CA21_1054" # female pop - 65 and over - % of pop below lim
-    
-    # lim count
-    , "count_lim_tot_parent" = "v_CA21_1010" # total pop - total years - % of pop below lim
-    , "count_lim_mal_parent" = "v_CA21_1011" # male pop - total years - % of pop below lim
-    , "count_lim_fem_parent" = "v_CA21_1012" # female pop - total years - % of pop below lim
-    , "count_lim_tot_65_over_parent" = "v_CA21_1022" # total pop - 65 and over - % of pop below lim
-    , "count_lim_mal_65_over_parent" = "v_CA21_1023" # male pop - 65 and over - % of pop below lim
-    , "count_lim_fem_65_over_parent" = "v_CA21_1024" # female pop - 65 and over - % of pop below lim
-    
-    , "count_lim_tot_in_lim" = "v_CA21_1025" # total pop - total years - % of pop below lim
-    , "count_lim_mal_in_lim" = "v_CA21_1026" # male pop - total years - % of pop below lim
-    , "count_lim_fem_in_lim" = "v_CA21_1027" # female pop - total years - % of pop below lim
-    , "count_lim_tot_65_over_in_lim" = "v_CA21_1037" # total pop - 65 and over - % of pop below lim
-    , "count_lim_mal_65_over_in_lim" = "v_CA21_1038" # male pop - 65 and over - % of pop below lim
-    , "count_lim_fem_65_over_in_lim" = "v_CA21_1039" # female pop - 65 and over - % of pop below lim
-
-    
-    # vis minority
-    , "tot_vis_minority_tot_parent" = "v_CA21_4872"
-    , "tot_vis_minority_mal_parent" = "v_CA21_4873"
-    , "tot_vis_minority_fem_parent" = "v_CA21_4874"
-    
-    , "tot_vis_minority_tot" = "v_CA21_4875"
-    , "tot_vis_minority_mal" = "v_CA21_4876"
-    , "tot_vis_minority_fem" = "v_CA21_4877"
-    
-  ),
-  
-  # census DA geography
-  level = 'CT',
-  
-  # put the downloaded data in our cache directory
-  use_cache = TRUE,
-  
-  # get the associated geography in {sf} format
-  geo_format = 'sf'
-) %>% janitor::clean_names()
+```{r censuscma}
+# montreal_cma_ct <- get_census(
+#   # 2021 census
+#   dataset = 'CA21', 
+#   
+#   # toronto is CMA code 535; oshawa 532
+#   regions = list(
+#     CMA = c("24462") # metro -> necessary for plotting all the data
+#     # CD = c("2466") # regional district
+#     # CSD = c("2466023") # city
+#     ),
+#   
+#   # our variables of interest
+#   vectors = c(
+#     "total_tot" = "v_CA21_8"
+#     , "male_tot" = "v_CA21_9"
+#     , "female_tot" = "v_CA21_10"
+#     , "age_0_14_tot" = "v_CA21_11"
+#     , "age_0_14_mal" = "v_CA21_12"
+#     , "age_0_14_fem" = "v_CA21_13"
+#     , "age_15_19_tot" = "v_CA21_71"
+#     , "age_15_19_mal" = "v_CA21_72"
+#     , "age_15_19_fem" = "v_CA21_73"
+#     , "age_20_24_tot" = "v_CA21_89"
+#     , "age_20_24_mal" = "v_CA21_90"
+#     , "age_20_24_fem" = "v_CA21_91"
+#     , "age_25_29_tot" = "v_CA21_107"
+#     , "age_25_29_mal" = "v_CA21_108"
+#     , "age_25_29_fem" = "v_CA21_109"
+#     , "age_30_34_tot" = "v_CA21_125"
+#     , "age_30_34_mal" = "v_CA21_126"
+#     , "age_30_34_fem" = "v_CA21_127"
+#     , "age_35_39_tot" = "v_CA21_143"
+#     , "age_35_39_mal" = "v_CA21_144"
+#     , "age_35_39_fem" = "v_CA21_145"
+#     , "age_40_44_tot" = "v_CA21_161"
+#     , "age_40_44_mal" = "v_CA21_162"
+#     , "age_40_44_fem" = "v_CA21_163"
+#     , "age_45_49_tot" = "v_CA21_179"
+#     , "age_45_49_mal" = "v_CA21_180"
+#     , "age_45_49_fem" = "v_CA21_181"
+#     , "age_50_54_tot" = "v_CA21_197"
+#     , "age_50_54_mal" = "v_CA21_198"
+#     , "age_50_54_fem" = "v_CA21_199"
+#     , "age_55_59_tot" = "v_CA21_215"
+#     , "age_55_59_mal" = "v_CA21_216"
+#     , "age_55_59_fem" = "v_CA21_217"
+#     , "age_60_64_tot" = "v_CA21_233"
+#     , "age_60_64_mal" = "v_CA21_234"
+#     , "age_60_64_fem" = "v_CA21_235"
+#     , "age_65_over_tot" = "v_CA21_251"
+#     , "age_65_over_mal" = "v_CA21_252"
+#     , "age_65_over_fem" = "v_CA21_253"
+#     
+#     # lim count
+#     , "count_lim_tot_parent" = "v_CA21_1010" # total pop - total years - % of pop below lim
+#     , "count_lim_mal_parent" = "v_CA21_1011" # male pop - total years - % of pop below lim
+#     , "count_lim_fem_parent" = "v_CA21_1012" # female pop - total years - % of pop below lim
+#     , "count_lim_tot_65_over_parent" = "v_CA21_1022" # total pop - 65 and over - % of pop below lim
+#     , "count_lim_mal_65_over_parent" = "v_CA21_1023" # male pop - 65 and over - % of pop below lim
+#     , "count_lim_fem_65_over_parent" = "v_CA21_1024" # female pop - 65 and over - % of pop below lim
+#     
+#     , "count_lim_tot_in_lim" = "v_CA21_1025" # total pop - total years - % of pop below lim
+#     , "count_lim_mal_in_lim" = "v_CA21_1026" # male pop - total years - % of pop below lim
+#     , "count_lim_fem_in_lim" = "v_CA21_1027" # female pop - total years - % of pop below lim
+#     , "count_lim_tot_65_over_in_lim" = "v_CA21_1037" # total pop - 65 and over - % of pop below lim
+#     , "count_lim_mal_65_over_in_lim" = "v_CA21_1038" # male pop - 65 and over - % of pop below lim
+#     , "count_lim_fem_65_over_in_lim" = "v_CA21_1039" # female pop - 65 and over - % of pop below lim
+# 
+#     
+#     # vis minority
+#     , "tot_vis_minority_tot_parent" = "v_CA21_4872"
+#     , "tot_vis_minority_mal_parent" = "v_CA21_4873"
+#     , "tot_vis_minority_fem_parent" = "v_CA21_4874"
+#     
+#     , "tot_vis_minority_tot" = "v_CA21_4875"
+#     , "tot_vis_minority_mal" = "v_CA21_4876"
+#     , "tot_vis_minority_fem" = "v_CA21_4877"
+#     
+#   ),
+#   
+#   # census DA geography
+#   level = 'CT',
+#   
+#   # put the downloaded data in our cache directory
+#   use_cache = TRUE,
+#   
+#   # get the associated geography in {sf} format
+#   geo_format = 'sf'
+# ) %>% janitor::clean_names()
+```
 
 
+```{r censuscdct}
 montreal_cd_ct <- get_census(
   # 2021 census
   dataset = 'CA21', 
@@ -260,7 +253,7 @@ Set crs for census data
 ```{r}
 # utm zone for montreal: utm18 -> epsg 26918
 # https://mangomap.com/robertyoung/maps/69585/what-utm-zone-am-i-in-#
-montreal_cma_ct <- sf::st_transform(montreal_cma_ct, crs = 26918)
+# montreal_cma_ct <- sf::st_transform(montreal_cma_ct, crs = 26918)
 montreal_cd_ct <- sf::st_transform(montreal_cd_ct, crs = 26918)
 # sf::st_crs(montreal_cma_ct) <- 4326
 # sf::st_crs(montreal_cd_ct) <- 4326
@@ -275,23 +268,26 @@ montreal_cd_ct <- montreal_cd_ct %>%
 ```
 
 
-
-## Buffer: Plot CT and survey data
+## Buffer
 
 Create buffer for finding points inside polygons:
 
 ```{r}
 cd_buff <- sf::st_buffer(montreal_cd_ct, 250)
-cma_buff <- sf::st_buffer(montreal_cma_ct, 250)
+# cma_buff <- sf::st_buffer(montreal_cma_ct, 250)
 ```
+
+## Spatial fitler
 
 Find survey respondents that live inside Montreal (CD or CMA?).
 Spatial filtering.
 
-```{r}
+```{r spatialfiltersurvey}
 ## spatial filtering using `[`
 survey_filter_cd <- survey_sf[cd_buff, ]
+```
 
+```{r spatialfilteroldcode}
 ## spatial filtering selecting geometries: st_filter works for new survey sf
 # f_st_filter <- function(points_df, buff_df){
 # 
@@ -325,20 +321,6 @@ survey_filter_cd <- survey_sf[cd_buff, ]
 #   filter(inside_cma > 0)
 ```
 
-Plot boundaries and points to check which points fall outside the 250m buffer.
-
-```{r}
-
-# mapview(list(survey_filter_cd, montreal_cd_ct))
-
-tm_shape(montreal_cma_ct) +
-  tm_polygons(col = "beige") +
-  tm_shape(montreal_cd_ct) +
-  tm_polygons() +
-  tm_shape(survey_filter_cd) +
-  tm_dots()
-```
-
 ## Create categories survey
 
 *Reminder*: our objective is to compare the spatial distribution of the sample agains the spatial distribution of the *population over 50* at the CT level.
@@ -346,16 +328,10 @@ tm_shape(montreal_cma_ct) +
 To do so, we check if the sample *underrepresents* (i.e., has a *smaller* percentage of people over 50 than the percentage of individuals from that age within the CT according to the census) or **overrepresents** (i.e., has a **higher** percentage than the census).
 
 We need to create a category for people over 50.
+
 ```{r}
 # get total population sum
-# cma_pop = sum(montreal_cma_ct$population, na.rm = T)
-cd_pop = sum(montreal_cd_ct$population, na.rm = T)
-
-# montreal_cma_ct <- montreal_cma_ct %>% 
-#   dplyr::mutate(
-#     age_50_over = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
-#     , prop_age_50_over = age_50_over / cma_pop
-#   )
+cd_pop = sum(montreal_cd_ct$total_tot, na.rm = T)
 
 montreal_cd_ct <- montreal_cd_ct %>% 
   dplyr::mutate(
@@ -379,20 +355,9 @@ montreal_cd_ct <- montreal_cd_ct %>%
 # count number of points in polygons
 # ptsinpoly <- st_intersects(montreal_cd_ct, survey_sf)
 # montreal_cd_ct$count <- lengths(ptsinpoly)
-
-
 ```
 
 ## Plot data
-```{r}
-# plot number of survey respondents in each CT
-tm_shape(montreal_cd_ct) + 
-  tm_fill(
-    col = "count_survey"
-    # , style = "jenks"
-    , pal=c("grey",RColorBrewer::brewer.pal(4, "YlOrBr"))
-    )
-```
 
 
 ```{r}
@@ -486,8 +451,6 @@ tmct_survey <- tm_shape(montreal_cd_ct) +
 tmap_arrange(tmct_census, tmct_survey)
 ```
 
-
-
 ```{r}
 # compare distributions
 DataExplorer::plot_histogram(
@@ -496,16 +459,6 @@ DataExplorer::plot_histogram(
   )
 ```
 
-
-```{r}
-# FIGURE OUT HOW TO COMPARE THESE PROPORTIONS
-# montreal_cd_ct <- montreal_cd_ct %>%
-#   mutate(
-#     representation = case_when(
-#       prop_survey <
-#     )
-#   )
-```
 
 # FSA data
 
@@ -556,7 +509,6 @@ fsa_shp <- sf::st_read("data/statscan_fsa census_2021/lfsa000b21a_e.shp")
 fsa_shp <- janitor::clean_names(fsa_shp)
 ```
 
-
 ## Filter FSA
 
 ```{r}
@@ -570,9 +522,8 @@ fsa_shp <- sf::st_transform(fsa_shp, 26918)
 ```
 
 
-
 ## Plot CT and FSA maps
-FSA map appears to contain a territorty larger than the boundaries of the island of Montreal.
+FSA map appears to contain a territory larger than the boundaries of the island of Montreal.
 The plot below shows which postal codes can be excluded from the FSA .shp so that CT and FSA refer to the same areas.
 
 ```{r}
@@ -616,16 +567,6 @@ Find survey respondents that live inside Montreal (CD).
 survey_filter_cd_fsa <- survey_sf[cd_buff_fsa, ]
 ```
 
-Plot boundaries and points to check which points fall outside the 250m buffer.
-
-```{r}
-tm_shape(montreal_cma_ct) +
-  tm_polygons(col = "beige") +
-  tm_shape(fsa_shp) +
-  tm_polygons() +
-  tm_shape(survey_filter_cd_fsa) +
-  tm_dots()
-```
 
 ## Join CRASS data with FSA .shp
 
@@ -648,7 +589,6 @@ montreal_fsa <- montreal_fsa %>%
   )
 
 montreal_fsa <- montreal_fsa %>% sf::st_as_sf()
-
 ```
 
 ## Replace NA
@@ -686,17 +626,6 @@ montreal_fsa <- montreal_fsa %>%
 ```
 
 ## Plot data
-```{r}
-# plot number of survey respondents in each FSA
-montreal_fsa %>% 
-  mutate(count_survey = na_if(count_survey, 0L)) %>% 
-  tm_shape() +
-  tm_fill(
-    col = "count_survey"
-    , style = "jenks"
-    )
-```
-
 
 ```{r}
 #| warning: false
@@ -843,8 +772,7 @@ montreal_fsa <- montreal_fsa %>%
 ```
 
 
-
-Plot flagged observations against 
+Plot flagged observations 
 ```{r}
 tmct_flag <- montreal_cd_ct %>% 
   mutate(prop_survey = na_if(prop_survey, 0L)) %>% 
@@ -880,8 +808,8 @@ tmap_save(
   )
 ```
 
-# Under/over representation map
 
+# Under/over representation map
 
 ```{r}
 f_under_over <- function(df){
@@ -902,13 +830,12 @@ f_under_over <- function(df){
     , label_survey = as.character(prop_survey %>% round(3))
     , label_census = paste0("(", prop_age_50_over %>% round(3), ")")
     )
-  
 }
 
 montreal_cd_ct <- f_under_over(montreal_cd_ct)
 montreal_fsa <- f_under_over(montreal_fsa)
-
 ```
+
 
 ```{r}
 # plot data
@@ -916,7 +843,7 @@ tm_shape(montreal_fsa) +
   tm_polygons(
     col = "under_over"
     , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
-    , palette = "PuOr"
+    , palette = "BrBG"
     , border.alpha = 0.25
     , alpha = 0.95
     , labels = c("0.00-0.50: Survey underrepresents","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Survey overrepresents')
@@ -945,9 +872,6 @@ tm_shape(montreal_fsa) +
   )
 ```
 
-```{r}
-
-```
 
 
 # Save data
