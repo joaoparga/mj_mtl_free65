@@ -32,6 +32,7 @@ options(datatable.optimize=Inf)
 
 # Read data
 
+## Survey data
 ```{r readdata}
 #| include: false
 # montreal fsa
@@ -42,24 +43,39 @@ montreal_cd_ct <- sf::st_read("data/report/montreal_cd_ct_count.gpkg")
 survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
 ```
 
-# CREATE VARS
+## Translated data
+```{r readjointranslated}
+f_join_translated <- function(df){
+  
+  df_translated_q45_21 <- data.table::fread("data/translated_q45_21.csv")
+
+  df_translated_q21_14_text <- data.table::fread("data/translated_q21_14_text.csv")
+  
+  df <- df %>% 
+    dplyr::left_join(df_translated_q45_21 %>% select(-q45_21_text), by = "v1") %>%
+    dplyr::left_join(df_translated_q21_14_text %>% select(-q21_14_text), by = "v1")
+}
+
+survey_filter_cd <- f_join_translated(survey_filter_cd)
+```
+
+# f_unique_sort
+```{r}
+f_unique_sort <- function(df, var1){
+  df %>% 
+    dplyr::pull({{var1}}) %>% 
+    unique() %>%
+    sort()
+}
+```
+
+
+# Create vars
 
 
 ## Survey
 
-```{r}
-
-```
-
-```{r readtranslateddata}
-df_translated_q45_21 <- data.table::fread("data/translated_q45_21.csv")
-```
-
-```{r jointranslateddata}
-survey_filter_cd <- survey_filter_cd %>% 
-  dplyr::left_join(df_translated_q45_21 %>% select(-q45_21_text), by = "v1")
-```
-
+### Demographics
 
 ```{r createvarsdemographics}
 pattern_vis_minority_q48 <- "Southeast Asian origins|South Asian origins|Northeast Asian origins|West Asian origins|Caribbean origins|Latin, Central and South American origins|African origins|Arabic origins/North African origins"
@@ -279,6 +295,8 @@ survey_filter_cd <- survey_filter_cd %>%
 
 ```
 
+### Correct missing code
+
 ```{r correctmissingcoding}
 survey_filter_cd <- survey_filter_cd %>% 
   mutate(
@@ -286,6 +304,7 @@ survey_filter_cd <- survey_filter_cd %>%
   )
 ```
 
+### Travel behaviour
 
 ```{r createvarstravelbehaviour}
 survey_filter_cd <- survey_filter_cd %>% 
@@ -298,26 +317,86 @@ survey_filter_cd <- survey_filter_cd %>%
       , .default = "no"
     ))
     , last_7_mode_transit = as_factor(case_when(
-      str_detect(string = q21, pattern = "(B|b)us|rail|Metro|Paratransit") ~ "yes"
+      str_detect(string = q21, pattern = "(B|b)us|rail|Metro|Paratransit") |
+        str_detect(string = q21_14_text_trans, "REM|River shuttle|Metro|Paratransit|STL bus|VIA train") ~ "yes"
       , q21 == "" ~ NA_character_
       , .default = "no"
     ))
     , last_7_mode_car = as_factor(case_when(
-      str_detect(string = q21, pattern = "Own car|Carpooling|Carsharing") ~ "yes"
+      str_detect(string = q21, pattern = "Own car|Carpooling|Carsharing") |
+        str_detect(string = q21_14_text_trans, "Automotive|use it in summer|parent's car|Personal car") ~ "yes"
       , q21 == "" ~ NA_character_
       , .default = "no"
     ))
     , last_7_mode_active = as_factor(case_when(
-      str_detect(string = q21, pattern = "Walking|Own bike|Self-service bike") ~ "yes"
+      str_detect(string = q21, pattern = "Walking|Own bike|Self-service bike") |
+        str_detect(string = q21_14_text_trans, "(w|W)alk|(b|B)icycle") ~ "yes"
       , q21 == "" ~ NA_character_
       , .default = "no"
     ))
-    , 
   )
 ```
 
-```{r countmostusedmode}
+### Vars by mode_destination
 
+```{r varsq22q96}
+df_count <- survey_filter_cd
+df_count <- df_count %>% 
+  select(v1, q22_1:q94_10)
+
+df_count <- df_count %>% 
+  rename_with(.fn = ~str_replace(., "^q22", "mode_stmbus")) %>% 
+  rename_with(.fn = ~str_replace(., "^q95", "mode_metro")) %>% 
+  rename_with(.fn = ~str_replace(., "^q82", "mode_paratransit")) %>% 
+  rename_with(.fn = ~str_replace(., "^q83", "mode_otherbus")) %>% 
+  rename_with(.fn = ~str_replace(., "^q84", "mode_rail")) %>% 
+  rename_with(.fn = ~str_replace(., "^q85", "mode_walk")) %>% 
+  rename_with(.fn = ~str_replace(., "^q81", "mode_own_bike")) %>% 
+  rename_with(.fn = ~str_replace(., "^q86", "mode_service_bike")) %>% 
+  rename_with(.fn = ~str_replace(., "^q87", "mode_own_scooter")) %>% 
+  rename_with(.fn = ~str_replace(., "^q88", "mode_service_scooter")) %>% 
+  rename_with(.fn = ~str_replace(., "^q89", "mode_own_car")) %>% 
+  rename_with(.fn = ~str_replace(., "^q90", "mode_carpooling")) %>% 
+  rename_with(.fn = ~str_replace(., "^q91", "mode_car_sharing")) %>% 
+  rename_with(.fn = ~str_replace(., "^q92", "mode_taxi")) %>% 
+  rename_with(.fn = ~str_replace(., "^q94", "mode_motorcycle"))
+
+df_count <- df_count %>% 
+  rename_with(.fn = ~str_replace(., "_1$", "_dest_work")) %>% 
+  rename_with(.fn = ~str_replace(., "_2$", "_dest_school")) %>%
+  rename_with(.fn = ~str_replace(., "_3$", "_dest_food")) %>%
+  rename_with(.fn = ~str_replace(., "_4$", "_dest_errands")) %>%
+  rename_with(.fn = ~str_replace(., "_5$", "_dest_recreation")) %>%
+  rename_with(.fn = ~str_replace(., "_6$", "_dest_family_friends")) %>%
+  rename_with(.fn = ~str_replace(., "_7$", "_dest_health")) %>%
+  rename_with(.fn = ~str_replace(., "_8$", "_dest_community_events")) %>%
+  rename_with(.fn = ~str_replace(., "_9$", "_dest_accompany")) %>%
+  rename_with(.fn = ~str_replace(., "_10$", "_dest_volunteer"))
+
+  
+# count total trips
+df_trips <- df_count %>% 
+  # select(v1,stm_bus_work:stm_bus_volunteer) %>% 
+  st_drop_geometry() %>% 
+  pivot_longer(cols = mode_stmbus_dest_work:mode_motorcycle_dest_volunteer
+               ,names_to = "type", values_to = "count") %>% 
+  group_by(v1) %>% 
+  summarise(count_trips = sum(count, na.rm = T)) 
+
+6666666 CONTINUAR AQUI
+# count modes
+a <- df_count %>% 
+  # select(v1,stm_bus_work:stm_bus_volunteer) %>% 
+  st_drop_geometry() %>% 
+  pivot_longer(cols = mode_stmbus_dest_work:mode_motorcycle_dest_volunteer
+               ,names_to = "type", values_to = "count") %>% 
+  separate_wider_regex(
+  type
+  , c("mode_", mode = ".*", "_dest_", dest =".*")
+  )
+
+# str_extract("(?<=mode_)(.*)(?=_dest_)")
+# str_extract("(?<=dest_)(.*)")
 ```
 
 ```{r transitmaindestination}
