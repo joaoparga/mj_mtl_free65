@@ -295,14 +295,7 @@ survey_filter_cd <- survey_filter_cd %>%
 
 ```
 
-### Correct missing code
 
-```{r correctmissingcoding}
-survey_filter_cd <- survey_filter_cd %>% 
-  mutate(
-    across(q22_1:q96_10, ~dplyr::na_if(., -99L))
-  )
-```
 
 ### Travel behaviour
 
@@ -334,21 +327,187 @@ survey_filter_cd <- survey_filter_cd %>%
       , q21 == "" ~ NA_character_
       , .default = "no"
     ))
+    , awereness_free_pas65 = as_factor(case_when(
+      q23 == "No" ~ "no"
+      , q23 == "Yes" ~ "yes"
+      , .default = NA_character_
+    ))
+    , has_free_pass = as_factor(case_when(
+      q97 == "Yes" ~ "yes"
+      , q97 %in% c("No, but I’m not planning to get it", "No, but I’m planning to get it soon") ~ "no"
+      , .default = NA_character_
+    ))
+    , has_free_pas_categories = as_factor(case_when(
+      q97 %in% c("Prefer not to answer", "") ~ NA_character_ 
+      , .default = q97
+    ))
+    # figure out how to code
+    # , main_fare = as_factor(case_when(
+    #   q98 
+    # ))
+    , meets_demand_for_transit = as_factor(case_when(
+      # q100 %in% c("", "Prefer not to answer") ~ NA_character_
+      q100 == "Yes" ~ "yes"
+      , q100 == "No" ~ "no"
+      , .default = NA_character_
+    ))
+    , cost_transport_barrier = as.factor(case_when(
+      str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , str_detect(string = q25, pattern = "I can’t afford it") ~ "yes"
+      , .default = "no"
+    ))
+    , has_cost_transport_barrier = as.factor(case_when(
+      q101 == "Yes" ~ "yes"
+      , q101 == "No" ~ "no"
+      , .default = NA_character_
+    ))
+    , when_cost_transport_barrier = as_factor(case_when(
+      q26 %in% c("Today or yesterday", "In the last week") ~ "within_last_week"
+      , q26 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "previous_than_last_week"
+    ))
+    , suppressed_trip_alterantive_mode = as_factor(case_when(
+      q27 %in% c("Own bike","Self-service bike (BIXI, JUMP, etc.)","Walking") ~ "active"
+      , q27 %in% c("Own car"
+                   ,"Car-sharing (Communauto, Car2go, etc.)"
+                   , "Carpooling") ~ "car"
+      , q27 == "Did not make trip" ~ "suppressed_trip"
+      , q27 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = 'other'
+    ))
+    , suppressed_trip_dest = case_when(
+      q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = q28
+    )
+    , suppresed_dest_work = as_factor(case_when(
+      q28 == "Work" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_school = as_factor(case_when(
+      q28 == "Attend school, training, or job seeking" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_food = as_factor(case_when(
+      q28 == "Food (grocery, food bank)" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_errands = as_factor(case_when(
+      q28 == "Personal Errands (haircut, vet, banking)" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_recreation = as_factor(case_when(
+      q28 == "Recreation or entertainment (park, gym, movies)" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_family_friends = as_factor(case_when(
+      q28 == "Visit with family or friends" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_health = as_factor(case_when(
+      q28 == "Medical or health-related appointments" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_community_events = as_factor(case_when(
+      q28 == "Attend community events (i.e., club, church, etc. …)" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_accompany = as_factor(case_when(
+      q28 == "Taking someone else somewhere (i.e. caregiving)" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , suppresed_dest_volunteer = as_factor(case_when(
+      q28 == "Volunteering" ~ "yes"
+      , q28 %in% c("", "Prefer not to answer") ~ NA_character_
+      , .default = "no"
+    ))
+    , confident_transit = as_factor(case_when(
+      q102_5 %in% c("Agree", "Strongly Agree") ~ "yes"
+      , q102_5 %in% c("Disagree", "Strongly Disagree") ~ "no"
+      , q102_5 %in% c("Neither agree nor disagree") ~ "neither"
+      , .default = NA_character_
+    ))
+    , satisfied_transit = as_factor(case_when(
+      q109_1 %in% c("Agree", "Strongly Agree") ~ "yes"
+      , q109_1 %in% c("Disagree", "Strongly Disagree") ~ "no"
+      , q109_1 %in% c("Neither agree nor disagree") ~ "neither"
+      , .default = NA_character_
+    ))
+    , satisfaction_seeing_friends_family = as_factor(case_when(
+      q109_3 %in% c("Agree", "Strongly Agree") ~ "satisfied"
+      , q109_3 %in% c("Disagree", "Strongly Disagree") ~ "dissatisfied"
+      , q109_3 %in% c("", "Prefer not to answer", "Not applicable") ~ NA_character_
+      , .default = "neither"
+    ))
+    , satisfaction_recreation = as_factor(case_when(
+      q109_4 %in% c("Agree", "Strongly Agree") ~ "satisfied"
+      , q109_4 %in% c("Disagree", "Strongly Disagree") ~ "dissatisfied"
+      , q109_4 %in% c("", "Prefer not to answer", "Not applicable") ~ NA_character_
+      , .default = "neither"
+    ))
+    , satisfaction_community_events = as_factor(case_when(
+      q109_5 %in% c("Agree", "Strongly Agree") ~ "satisfied"
+      , q109_5 %in% c("Disagree", "Strongly Disagree") ~ "dissatisfied"
+      , q109_5 %in% c("", "Prefer not to answer", "Not applicable") ~ NA_character_
+      , .default = "neither"
+    ))
+    , satisfaction_activity_participation = as_factor(case_when(
+      satisfaction_seeing_friends_family == "satisfied" &
+        satisfaction_recreation == "satisfied" &
+        satisfaction_community_events == "satisfied" ~ "satisfied"
+      , satisfaction_seeing_friends_family == "dissatisfied" |
+        satisfaction_recreation == "dissatisfied" |
+        satisfaction_community_events == "dissatisfied" ~ "dissatisfied"
+      , is.na(satisfaction_seeing_friends_family) &
+        is.na(satisfaction_recreation) &
+        is.na(satisfaction_community_events) ~ NA_character_
+      , .default = "neither"
+      # q109_3 %in% c("Agree", "Strongly Agree") &
+      #   q109_4 %in% c("Agree", "Strongly Agree") &
+      #   q109_5 %in% c("Agree", "Strongly Agree") ~ "satisfied"
+      # , q109_3 %in% c("Disagree", "Strongly Disagree") |
+      #   q109_4 %in% c("Disagree", "Strongly Disagree") |
+      #   q109_5 %in% c("Disagree", "Strongly Disagree") ~ "dissatisfied"
+      # , q109_3 %in% c("", "Prefer not to answer","Not applicable") &
+      #   q109_4 %in% c("", "Prefer not to answer","Not applicable") &
+      #   q109_5 %in% c("", "Prefer not to answer","Not applicable") ~ NA_character_
+      # , .default = "neither"
+    ))
+    , difficulty_transport_expenses = as_factor(case_when(
+      q103 %in% c("Extremely difficult", "Somewhat difficult") ~ "yes"
+      , q103 %in% c("Extremely easy", "Somewhat easy") ~ "no"
+      , q103 %in% c("Neither easy nor difficult") ~ "neither"
+      , .default = NA_character_
+    ))
+    , follow_up = as_factor(case_when(
+      q20 %in% c("", "-99") ~ NA_character_
+      , .default = q20
+    ))
   )
 ```
+
+
 
 ### Vars by mode_destination
 
 ```{r varsq22q96}
 df_count <- survey_filter_cd
 df_count <- df_count %>% 
-  select(v1, q22_1:q94_10)
+  select(v1, q21, q22_1:q94_10)
 
 df_count <- df_count %>% 
-  rename_with(.fn = ~str_replace(., "^q22", "mode_stmbus")) %>% 
+  rename_with(.fn = ~str_replace(., "^q22", "mode_stm_bus")) %>% 
   rename_with(.fn = ~str_replace(., "^q95", "mode_metro")) %>% 
   rename_with(.fn = ~str_replace(., "^q82", "mode_paratransit")) %>% 
-  rename_with(.fn = ~str_replace(., "^q83", "mode_otherbus")) %>% 
+  rename_with(.fn = ~str_replace(., "^q83", "mode_other_bus")) %>% 
   rename_with(.fn = ~str_replace(., "^q84", "mode_rail")) %>% 
   rename_with(.fn = ~str_replace(., "^q85", "mode_walk")) %>% 
   rename_with(.fn = ~str_replace(., "^q81", "mode_own_bike")) %>% 
@@ -357,7 +516,7 @@ df_count <- df_count %>%
   rename_with(.fn = ~str_replace(., "^q88", "mode_service_scooter")) %>% 
   rename_with(.fn = ~str_replace(., "^q89", "mode_own_car")) %>% 
   rename_with(.fn = ~str_replace(., "^q90", "mode_carpooling")) %>% 
-  rename_with(.fn = ~str_replace(., "^q91", "mode_car_sharing")) %>% 
+  rename_with(.fn = ~str_replace(., "^q91", "mode_carsharing")) %>% 
   rename_with(.fn = ~str_replace(., "^q92", "mode_taxi")) %>% 
   rename_with(.fn = ~str_replace(., "^q94", "mode_motorcycle"))
 
@@ -373,35 +532,424 @@ df_count <- df_count %>%
   rename_with(.fn = ~str_replace(., "_9$", "_dest_accompany")) %>%
   rename_with(.fn = ~str_replace(., "_10$", "_dest_volunteer"))
 
+# create factor for each mode
+df_count <- df_count %>% 
+  mutate(
+    last_7_stm_bus = as_factor(case_when(
+      str_detect(string = q21, pattern = "STM bus") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_metro = as_factor(case_when(
+      str_detect(string = q21, pattern = "Metro") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_paratransit = as_factor(case_when(
+      str_detect(string = q21, pattern = "STM Paratransit") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_other_bus = as_factor(case_when(
+      str_detect(string = q21, pattern = "Bus (not with the STM)") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_rail = as_factor(case_when(
+      str_detect(string = q21, pattern = "Commuter rail") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_walk = as_factor(case_when(
+      str_detect(string = q21, pattern = "Walking") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_own_bike = as_factor(case_when(
+      str_detect(string = q21, pattern = "Own bike") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_own_scooter = as_factor(case_when(
+      str_detect(string = q21, pattern = "Own scooter") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_service_bike = as_factor(case_when(
+      str_detect(string = q21, pattern = "Self-service bike") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_service_scooter = as_factor(case_when(
+      str_detect(string = q21, pattern = "Self-service scooter") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_own_car = as_factor(case_when(
+      str_detect(string = q21, pattern = "Own car") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_carpooling = as_factor(case_when(
+      str_detect(string = q21, pattern = "Carpooling") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_carsharing = as_factor(case_when(
+      str_detect(string = q21, pattern = "Carsharing") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_taxi = as_factor(case_when(
+      str_detect(string = q21, pattern = "Taxi") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+    , last_7_motorcycle = as_factor(case_when(
+      str_detect(string = q21, pattern = "Motorcycle") ~ "yes"
+      , q21 == "" ~ NA_character_
+      , .default = "no"
+    ))
+  )
   
-# count total trips
-df_trips <- df_count %>% 
-  # select(v1,stm_bus_work:stm_bus_volunteer) %>% 
-  st_drop_geometry() %>% 
-  pivot_longer(cols = mode_stmbus_dest_work:mode_motorcycle_dest_volunteer
-               ,names_to = "type", values_to = "count") %>% 
-  group_by(v1) %>% 
-  summarise(count_trips = sum(count, na.rm = T)) 
+```
 
-6666666 CONTINUAR AQUI
-# count modes
-a <- df_count %>% 
-  # select(v1,stm_bus_work:stm_bus_volunteer) %>% 
+```{r checkcodedmissingvalues}
+# check if -99 values in q22_1:q96_10 are missing values (NA) or zero
+# for MJ's presentation: wasn't able to automate coding
+# did checking using filter
+# started doind check with case_when, but would take too long
+
+# BOTTOM LINE (oct 09): ALL -99 CORRESPOND TO ZEROS, BECAUSE NO INDIVIDUAL 
+# i) declared using <mode> (e.g. stm bus) on q21
+# ii) had ALL columns referred to that mode (q22) equal to 0, -99 or NA
+
+# df_count %>% 
+#   mutate(
+#     examples_stm_bus = case_when(
+#       last_7_stm_bus == "yes" &
+#         (mode_stm_bus_dest_work %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_work)) |
+#         (mode_stm_bus_dest_school %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_school)) |
+#         (mode_stm_bus_dest_food %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_food)) |
+#         (mode_stm_bus_dest_errands %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_errands)) |
+#         (mode_stm_bus_dest_recreation %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_recreation)) |
+#         (mode_stm_bus_dest_family_friends %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_family_friends)) |
+#         (mode_stm_bus_dest_health %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_health)) |
+#         (mode_stm_bus_dest_community_events %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_community_events)) |
+#         (mode_stm_bus_dest_accompany %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_accompany)) |
+#         (mode_stm_bus_dest_volunteer %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_volunteer)) ~ "example_a"
+#       , last_7_stm_bus == "yes" &
+#         (mode_stm_bus_dest_work %in% c(0L, -99L) | is.na(mode_stm_bus_dest_work)) |
+#         (mode_stm_bus_dest_school %in% c(0L, -99L) | is.na(mode_stm_bus_dest_school)) |
+#         (mode_stm_bus_dest_food %in% c(0L, -99L) | is.na(mode_stm_bus_dest_food)) |
+#         (mode_stm_bus_dest_errands %in% c(0L, -99L) | is.na(mode_stm_bus_dest_errands)) |
+#         (mode_stm_bus_dest_recreation %in% c(0L, -99L) | is.na(mode_stm_bus_dest_recreation)) |
+#         (mode_stm_bus_dest_family_friends %in% c(0L, -99L) | is.na(mode_stm_bus_dest_family_friends)) |
+#         (mode_stm_bus_dest_health %in% c(0L, -99L) | is.na(mode_stm_bus_dest_health)) |
+#         (mode_stm_bus_dest_community_events %in% c(0L, -99L) | is.na(mode_stm_bus_dest_community_events)) |
+#         (mode_stm_bus_dest_accompany %in% c(0L, -99L) | is.na(mode_stm_bus_dest_accompany)) |
+#         (mode_stm_bus_dest_volunteer %in% c(0L, -99L) | is.na(mode_stm_bus_dest_volunteer)) ~ "example_b"
+#       , T ~ "error"
+#     )
+#   ) %>% unique(examples)
+# 
+# # or check using filter
+# 
+# df_count %>% 
+#   filter(last_7_stm_bus=="yes") %>% 
+#   select(v1,contains("mode_stm_bus")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_metro=="yes") %>% 
+#   select(v1,contains("mode_metro")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_paratransit=="yes") %>% 
+#   select(v1,contains("mode_paratransit")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_other_bus=="yes") %>% 
+#   select(v1,contains("mode_other_bus")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_rail=="yes") %>% 
+#   select(v1,contains("mode_rail")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_own_bike=="yes") %>% 
+#   select(v1,contains("mode_own_bike")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_service_bike=="yes") %>% 
+#   select(v1,contains("mode_service_bike")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_own_scooter=="yes") %>% 
+#   select(v1,contains("mode_own_scooter")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_service_scooter=="yes") %>% 
+#   select(v1,contains("mode_service_scooter")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_own_car=="yes") %>% 
+#   select(v1,contains("mode_own_car")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_carpooling=="yes") %>% 
+#   select(v1,contains("mode_carpooling")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_carsharing=="yes") %>% 
+#   select(v1,contains("mode_carsharing")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_taxi=="yes") %>% 
+#   select(v1,contains("mode_taxi")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+# df_count %>% 
+#   filter(last_7_motorcycle=="yes") %>% 
+#   select(v1,contains("mode_motorcycle")) %>% 
+#   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
+#   nrow()
+# 
+
+```
+
+### Correct missing code
+
+```{r correctmissingcoding}
+data.table::setDT(df_count)
+# OBS CHECK mode_ columns position before running code below
+colunas <- colnames(df_count[,3:152])
+df_count[
+  , (colunas) := replace(.SD, .SD == -99L, 0L)
+  , .SDcols = colunas
+  ]
+
+# df_count <- df_count %>% 
+#   mutate(
+#     across(mode_stm_bus_dest_work:mode_motorcycle_dest_volunteer, ~dplyr::na_if(., -99L))
+#   )
+```
+
+
+```{r counttrips}
+f_count_trips <- function(){
+  
+  # count trips by mode and destination
+df_trips <- df_count %>% 
+  select(v1,mode_stm_bus_dest_work:mode_motorcycle_dest_volunteer) %>% 
   st_drop_geometry() %>% 
-  pivot_longer(cols = mode_stmbus_dest_work:mode_motorcycle_dest_volunteer
+  pivot_longer(cols = mode_stm_bus_dest_work:mode_motorcycle_dest_volunteer
                ,names_to = "type", values_to = "count") %>% 
   separate_wider_regex(
   type
   , c("mode_", mode = ".*", "_dest_", dest =".*")
+  ) %>% 
+  mutate(
+    # replace NA
+    count = tidyr::replace_na(count, 0L)
+    # identify transit trips
+    , type = case_when(
+      mode %in% c("metro", "other_bus", "paratransit", "rail", "stm_bus") ~ "transit"
+      , mode %in% c("walk", "own_bike", "service_bike") ~ "active"
+      , mode %in% c("own_car", "carsharing") ~ "car"
+      , .default = "other"
+    )
+    )
+
+data.table::setDT(df_trips)
+
+# count total trips
+df_trips_total <- df_trips %>% 
+  group_by(v1) %>% 
+  summarise(count_trips_total = sum(count, na.rm = T)) %>% 
+  mutate(avg_trips_total = count_trips_total / 7)
+
+
+# count modes used
+df_modes <- df_trips[
+  !is.na(count) & count != 0L
+  , .(count_modes = data.table::uniqueN(c(mode)))
+  , by = .(v1)
+]
+
+df_count_modes <- df_count %>% select(v1) %>% 
+  dplyr::left_join(df_modes, by = "v1")
+rm(df_modes)
+
+df_count_modes <- df_count_modes %>% 
+  mutate(count_modes = tidyr::replace_na(count_modes, 0L))
+
+# count destination
+df_dest <- df_trips[
+  !is.na(count) & count != 0L
+  , .(count_dest = data.table::uniqueN(c(dest)))
+  , by = .(v1)
+]
+
+df_count_dest <- df_count %>% select(v1) %>% 
+  dplyr::left_join(df_dest, by = "v1")
+rm(df_dest)
+
+df_count_dest <- df_count_dest %>% 
+  mutate(count_dest = tidyr::replace_na(count_dest, 0L))
+
+# count trips by mode
+df_trips_mode <- df_trips %>% 
+  group_by(v1, mode) %>% 
+  summarise(count_trips_mode = sum(count, na.rm = T)) 
+
+df_trips_mode_wide <- df_trips_mode %>% 
+  pivot_wider(
+    id_cols = v1
+    , names_from = mode
+    , values_from = count_trips_mode
+    , names_prefix = "count_trips_"
+    )
+
+# count trips by type
+df_trips_type <- df_trips %>% 
+  group_by(v1, type) %>% 
+  summarise(count_trips_type = sum(count, na.rm = T))
+
+df_trips_type_wide <- df_trips_type %>% 
+  pivot_wider(
+    id_cols = v1
+    , names_from = type
+    , values_from = count_trips_type
+    , names_prefix = "count_trips_"
   )
 
+# count trips by dest
+df_trips_dest <- df_trips %>% 
+  group_by(v1, dest) %>% 
+  summarise(count_trips_dest = sum(count, na.rm = T))
+
+df_trips_dest_wide <- df_trips_dest %>% 
+  pivot_wider(
+    id_cols = v1
+    , names_from = dest
+    , values_from = count_trips_dest
+    , names_prefix = "count_trips_"
+    )
+  
+# main dest, mode, type
+   # LATER: HOW TO DEALT WITH TIES?
+df_main_ind_trip <- df_trips[, .SD[which.max(count)], by = .(v1)]
+
+data.table::setDT(df_trips_dest)
+df_main_trip_dest <- df_trips_dest[, .SD[which.max(count_trips_dest)], by = .(v1)] %>% 
+  mutate(
+    main_dest = case_when(
+      count_trips_dest == 0L ~ NA_character_
+      , .default = dest
+    )
+      )
+
+data.table::setDT(df_trips_mode)
+df_main_trip_mode <- df_trips_mode[, .SD[which.max(count_trips_mode)], by = .(v1)] %>% 
+  mutate(
+    main_mode = case_when(
+      count_trips_mode == 0L ~ NA_character_
+      , .default = mode
+    )
+  )
+
+data.table::setDT(df_trips_type)
+df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(v1)] %>% 
+  mutate(
+    main_type = case_when(
+      count_trips_type == 0L ~ NA_character_
+      , .default = type
+    )
+  )
+
+# 
+# df_main <- df_main %>% 
+#   # filter(!count == 0L) %>% 
+#   mutate(
+#     main_mode = case_when(
+#       count != 0L ~ mode, 
+#       count == 0L ~ NA_character_
+#         )
+#     , main_dest = case_when(
+#       count != 0L ~ dest, 
+#       count == 0L ~ NA_character_
+#         )
+#     , main_type = case_when(
+#       count != 0L ~ type, 
+#       count == 0L ~ NA_character_
+#         )
+#   )
+
+# df_trips %>% group_by(v1, type) %>%
+#   mutate(the_rank  = rank(-count, ties.method = "max")) %>%
+#   filter(the_rank == 1)
+
+# create list with dfs
+  lista <- list(
+    "df_trips" = df_trips
+    , 'df_trips_total' = df_trips_total
+    , 'df_count_modes' = df_count_modes
+    , 'df_count_dest' = df_count_dest
+    , 'df_trips_mode' = df_trips_mode
+    , 'df_trips_mode_wide' = df_trips_mode_wide
+    , 'df_trips_dest' = df_trips_dest
+    , 'df_trips_dest_wide' = df_trips_dest_wide
+    , "df_main_ind_trip" = df_main_ind_trip
+    , "df_main_trip_dest" = df_main_trip_dest
+    , "df_main_trip_mode" = df_main_trip_mode
+    , "df_main_trip_type" = df_main_trip_type
+  )
+  
+
+  
+  return(lista)
+}
+
+l_trips <- f_count_trips()
 # str_extract("(?<=mode_)(.*)(?=_dest_)")
 # str_extract("(?<=dest_)(.*)")
 ```
 
-```{r transitmaindestination}
-
+```{r joincounttrips}
+survey_filter_cd <- survey_filter_cd %>% 
+  dplyr::left_join(l_trips$df_trips_total) %>% 
+  dplyr::left_join(l_trips$df_count_modes) %>% 
+  dplyr::left_join(l_trips$df_count_dest) %>% 
+  dplyr::left_join(l_trips$df_main_trip_dest %>% select(v1,main_dest)) %>% 
+  dplyr::left_join(l_trips$df_main_trip_mode %>% select(v1,main_mode)) %>% 
+  dplyr::left_join(l_trips$df_main_trip_type %>% select(v1,main_type))
 ```
+
 
 
 ```{r factorrelevel}
