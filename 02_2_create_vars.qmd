@@ -35,13 +35,22 @@ options(datatable.optimize=Inf)
 ## Survey data
 ```{r readdata}
 #| include: false
+# survey filtered data
+survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
+```
+
+## Montreal shapes
+```{r}
+#| include: false
 # montreal fsa
 montreal_fsa <- sf::st_read("data/report/montreal_fsa_count.gpkg")
 # montreal cd (ct)
 montreal_cd_ct <- sf::st_read("data/report/montreal_cd_ct_count.gpkg")
-# survey filtered data
-survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
+# montreal split
+montreal_split <- sf::st_read("data/montreal_split/RA_CBC_EOD18.shp") %>% 
+  janitor::clean_names()
 ```
+
 
 ## Translated data
 ```{r readjointranslated}
@@ -124,11 +133,11 @@ survey_filter_cd <- survey_filter_cd %>%
     )
     # in lim
     # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
-    , in_lim = case_when(
-      income_midpoint < lim_threshold ~ "yes"
-      , income_midpoint >= lim_threshold ~ "no"
+    , in_lim = as_factor(case_when(
+      income_midpoint < lim_threshold ~ "Yes"
+      , income_midpoint >= lim_threshold ~ "No"
       , .default = NA_character_
-    )
+    ))
     # gender
     , gender = as_factor(case_when(
       q41 == "Man" ~ "male"
@@ -191,20 +200,20 @@ survey_filter_cd <- survey_filter_cd %>%
       , .default = age_raw
     )
     # age categories
-    , age_groups_5 = case_when(
+    , age_groups_5 = as_factor(case_when(
       age_corrected < 50L ~ "age_less_50"
       , age_corrected >= 50L & age_corrected <= 54L ~ "age_50_54"
       , age_corrected >= 55L & age_corrected <= 59L ~ "age_55_59"
       , age_corrected >= 60L & age_corrected <= 64L ~ "age_60_64"
       , age_corrected >= 65 ~ "age_65_over" 
       , .default = NA_character_
-    )
+    ))
     , age_groups_control_treat = case_when(
       age_corrected < 50L ~ "age_less_50"
-      , age_corrected >= 50L & age_corrected <= 64L ~ "age_50_64"
-      , age_corrected >= 65 ~ "age_65_over" 
-      , q40 == "Prefer not to answer" & q4 == "50-64" ~ "age_50_64"
-      , q40 == "Prefer not to answer" & q4 == "65 and older" ~ "age_65_over"
+      , age_corrected >= 50L & age_corrected <= 64L ~ "Control (50-64)"
+      , age_corrected >= 65L ~ "Treatment (65-over)" 
+      , q40 == "Prefer not to answer" & q4 == "50-64" ~ "Control (50-64)"
+      , q40 == "Prefer not to answer" & q4 == "65 and older" ~ "Treatment (65-over)"
       , .default = NA_character_
     )
     # visible minority 
@@ -217,22 +226,22 @@ survey_filter_cd <- survey_filter_cd %>%
         stringr::str_detect(
           string = q48_28_text
           , pattern_vis_minority_q48_28_text
-          ) ~ "visible_minority"
+          ) ~ "Visible minority"
       , stringr::str_detect(
         string = q48
         , pattern = "Native North American origins"
-      ) ~ "native_origins"
+      ) ~ "Native NA origins"
       , stringr::str_detect(
         string = q48
         , pattern = "I prefer not to answer"
       ) ~ NA_character_
-      , .default = "not_visible_minority"
+      , .default = "Non-visible minority"
     ))
     , educ_has_postsec = as_factor(case_when(
       str_detect(string = q43 , pattern = "College|CEGEP|Bachelor|Master") ~
-        "yes"
+        "Yes"
       , str_detect(string = q43 , pattern = "Primary|High") ~
-        "no"
+        "No"
       , T ~ NA_character_
     ))
     , vehicles_per_capita = case_when(
@@ -245,9 +254,9 @@ survey_filter_cd <- survey_filter_cd %>%
     )
     # check if "" means skipped or 
     , lone_household = as_factor(case_when(
-      household_size == 1 ~ "yes"
+      household_size == 1 ~ "Yes"
       , is.na(household_size) ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , employment = as_factor(case_when(
       str_detect(string = q45, pattern = "Unemployed") ~ "Unemployed"
@@ -262,34 +271,34 @@ survey_filter_cd <- survey_filter_cd %>%
     , employed = as_factor(case_when(
       str_detect(string = q45, pattern = "(part|full)-time") |
         # double check later
-        str_detect(string = q45_21_trans, pattern = "Self-employed|full-time|Work and retirement|Semi-retired") ~ "yes"
+        str_detect(string = q45_21_trans, pattern = "Self-employed|full-time|Work and retirement|Semi-retired") ~ "Yes"
       , str_detect(string = q45, pattern = "Prefer not to answer/I don’t know") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , unemployed = as_factor(case_when(
-      str_detect(string = q45, pattern = "Unemployed") ~ "Unemployed"
+      str_detect(string = q45, pattern = "Unemployed") ~ "Yes"
       , str_detect(string = q45, pattern = "Prefer not to answer/I don’t know") ~ NA_character_
-      , .default = "Other"
+      , .default = "No"
     ))
     , immigrant = as_factor(case_when(
-      q79 == "Born here " ~ "no"
+      q79 == "Born here " ~ "No"
       , q79 == "Prefer not to answer" ~ NA_character_
-      , .default = "yes"
+      , .default = "Yes"
     ))
     , any_functional_limitation = as_factor(case_when(
-      str_detect(string = q80, pattern = "No, I don’t have any") ~ "no"
+      str_detect(string = q80, pattern = "No, I don’t have any") ~ "No"
       , str_detect(string = q80, pattern = "I prefer not to answer") ~ NA_character_
-      , .default = "yes"
+      , .default = "Yes"
     ))
     , any_mobility_limitation = as_factor(case_when(
-      str_detect(string = q80, pattern = "Mobility") ~ "yes"
+      str_detect(string = q80, pattern = "Mobility") ~ "Yes"
       , str_detect(string = q80, pattern = "I prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , firstnations_metis_inuit = as_factor(case_when(
-      q47 == "No" ~ "no"
+      q47 == "No" ~ "No"
       , q47 == "Prefer not to answer" ~ NA_character_
-      , .default = "yes"
+      , .default = "Yes"
     ))
   )
 
@@ -305,36 +314,36 @@ survey_filter_cd <- survey_filter_cd %>%
       transit_once_week_plus = as_factor(case_when(
       q3 %in% c("1-2 days a week"
                 , "3-4 days a week"
-                , "5-7 days a week") ~ "yes"
+                , "5-7 days a week") ~ "Yes"
       , q3 == "Not Asked" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_mode_transit = as_factor(case_when(
       str_detect(string = q21, pattern = "(B|b)us|rail|Metro|Paratransit") |
-        str_detect(string = q21_14_text_trans, "REM|River shuttle|Metro|Paratransit|STL bus|VIA train") ~ "yes"
+        str_detect(string = q21_14_text_trans, "REM|River shuttle|Metro|Paratransit|STL bus|VIA train") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_mode_car = as_factor(case_when(
       str_detect(string = q21, pattern = "Own car|Carpooling|Carsharing") |
-        str_detect(string = q21_14_text_trans, "Automotive|use it in summer|parent's car|Personal car") ~ "yes"
+        str_detect(string = q21_14_text_trans, "Automotive|use it in summer|parent's car|Personal car") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_mode_active = as_factor(case_when(
       str_detect(string = q21, pattern = "Walking|Own bike|Self-service bike") |
-        str_detect(string = q21_14_text_trans, "(w|W)alk|(b|B)icycle") ~ "yes"
+        str_detect(string = q21_14_text_trans, "(w|W)alk|(b|B)icycle") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , awereness_free_pas65 = as_factor(case_when(
-      q23 == "No" ~ "no"
-      , q23 == "Yes" ~ "yes"
+      q23 == "No" ~ "No"
+      , q23 == "Yes" ~ "Yes"
       , .default = NA_character_
     ))
     , has_free_pass = as_factor(case_when(
-      q97 == "Yes" ~ "yes"
-      , q97 %in% c("No, but I’m not planning to get it", "No, but I’m planning to get it soon") ~ "no"
+      q97 == "Yes" ~ "Yes"
+      , q97 %in% c("No, but I’m not planning to get it", "No, but I’m planning to get it soon") ~ "No"
       , .default = NA_character_
     ))
     , has_free_pas_categories = as_factor(case_when(
@@ -345,99 +354,157 @@ survey_filter_cd <- survey_filter_cd %>%
     # , main_fare = as_factor(case_when(
     #   q98 
     # ))
-    , meets_demand_for_transit = as_factor(case_when(
+    , rides_transit_as_would_like = as_factor(case_when(
       # q100 %in% c("", "Prefer not to answer") ~ NA_character_
-      q100 == "Yes" ~ "yes"
-      , q100 == "No" ~ "no"
+      q100 == "Yes" ~ "Yes"
+      , q100 == "No" ~ "No"
       , .default = NA_character_
     ))
-    , cost_transport_barrier = as.factor(case_when(
-      str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
-      , str_detect(string = q25, pattern = "I can’t afford it") ~ "yes"
-      , .default = "no"
+    
+    # transit barriers q25
+    , transit_barrier_too_long = as.factor(case_when(
+      str_detect(string = q25, pattern = "Takes too long") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
     ))
-    , has_cost_transport_barrier = as.factor(case_when(
-      q101 == "Yes" ~ "yes"
-      , q101 == "No" ~ "no"
+    
+    , transit_barrier_not_reliable = as.factor(case_when(
+      str_detect(string = q25, pattern = "not reliable") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    
+    , transit_barrier_not_frequent = as.factor(case_when(
+      str_detect(string = q25, pattern = "Service is not frequent enough") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    
+    , transit_barrier_lack_capilarity = as.factor(case_when(
+      str_detect(string = q25, pattern = "Service doesn’t go where I need it") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    
+    , transit_barrier_isnt_available = as.factor(case_when(
+      str_detect(string = q25, pattern = "Service isn’t available when I need it") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    
+    , transit_barrier_not_worth = as.factor(case_when(
+      str_detect(string = q25, pattern = "It’s not worth the cost ") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    
+    , transit_barrier_cant_afford = as.factor(case_when(
+      str_detect(string = q25, pattern = "I can’t afford it") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    
+    , transit_barrier_cost_related = as.factor(case_when(
+      str_detect(string = q25, pattern = "I can’t afford it|It’s not worth the cost ") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    , transit_barrier_crowded = as.factor(case_when(
+      str_detect(string = q25, pattern = "Too crowded") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    
+    , transit_barrier_unsafe = as.factor(case_when(
+      str_detect(string = q25, pattern = "unsafe") ~ "Yes"
+      , str_detect(string = q25, pattern = "^$|Prefer not to answer") ~ NA_character_
+      , .default = "No"
+    ))
+    # CONTINUE LATER
+    
+    
+    , has_cost_prevented_transit = as.factor(case_when(
+      q101 == "Yes" ~ "Yes"
+      , q101 == "No" ~ "No"
       , .default = NA_character_
     ))
     , when_cost_transport_barrier = as_factor(case_when(
-      q26 %in% c("Today or yesterday", "In the last week") ~ "within_last_week"
+      q26 %in% c("Today or yesterday", "In the last week") ~ "Within last week"
       , q26 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "previous_than_last_week"
+      , .default = "Previous than last week"
     ))
     , suppressed_trip_alterantive_mode = as_factor(case_when(
-      q27 %in% c("Own bike","Self-service bike (BIXI, JUMP, etc.)","Walking") ~ "active"
+      q27 %in% c("Own bike","Self-service bike (BIXI, JUMP, etc.)","Walking") ~ "Active"
       , q27 %in% c("Own car"
                    ,"Car-sharing (Communauto, Car2go, etc.)"
-                   , "Carpooling") ~ "car"
-      , q27 == "Did not make trip" ~ "suppressed_trip"
+                   , "Carpooling") ~ "Car"
+      , q27 == "Did not make trip" ~ "Suppressed trip"
       , q27 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = 'other'
+      , .default = 'Other'
     ))
     , suppressed_trip_dest = case_when(
       q28 %in% c("", "Prefer not to answer") ~ NA_character_
       , .default = q28
     )
     , suppresed_dest_work = as_factor(case_when(
-      q28 == "Work" ~ "yes"
+      q28 == "Work" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_school = as_factor(case_when(
-      q28 == "Attend school, training, or job seeking" ~ "yes"
+      q28 == "Attend school, training, or job seeking" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_food = as_factor(case_when(
-      q28 == "Food (grocery, food bank)" ~ "yes"
+      q28 == "Food (grocery, food bank)" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_errands = as_factor(case_when(
-      q28 == "Personal Errands (haircut, vet, banking)" ~ "yes"
+      q28 == "Personal Errands (haircut, vet, banking)" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_recreation = as_factor(case_when(
-      q28 == "Recreation or entertainment (park, gym, movies)" ~ "yes"
+      q28 == "Recreation or entertainment (park, gym, movies)" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_family_friends = as_factor(case_when(
-      q28 == "Visit with family or friends" ~ "yes"
+      q28 == "Visit with family or friends" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_health = as_factor(case_when(
-      q28 == "Medical or health-related appointments" ~ "yes"
+      q28 == "Medical or health-related appointments" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_community_events = as_factor(case_when(
-      q28 == "Attend community events (i.e., club, church, etc. …)" ~ "yes"
+      q28 == "Attend community events (i.e., club, church, etc. …)" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_accompany = as_factor(case_when(
-      q28 == "Taking someone else somewhere (i.e. caregiving)" ~ "yes"
+      q28 == "Taking someone else somewhere (i.e. caregiving)" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , suppresed_dest_volunteer = as_factor(case_when(
-      q28 == "Volunteering" ~ "yes"
+      q28 == "Volunteering" ~ "Yes"
       , q28 %in% c("", "Prefer not to answer") ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , confident_transit = as_factor(case_when(
-      q102_5 %in% c("Agree", "Strongly Agree") ~ "yes"
-      , q102_5 %in% c("Disagree", "Strongly Disagree") ~ "no"
+      q102_5 %in% c("Agree", "Strongly Agree") ~ "Yes"
+      , q102_5 %in% c("Disagree", "Strongly Disagree") ~ "No"
       , q102_5 %in% c("Neither agree nor disagree") ~ "neither"
       , .default = NA_character_
     ))
     , satisfied_transit = as_factor(case_when(
-      q109_1 %in% c("Agree", "Strongly Agree") ~ "yes"
-      , q109_1 %in% c("Disagree", "Strongly Disagree") ~ "no"
+      q109_1 %in% c("Agree", "Strongly Agree") ~ "Yes"
+      , q109_1 %in% c("Disagree", "Strongly Disagree") ~ "No"
       , q109_1 %in% c("Neither agree nor disagree") ~ "neither"
       , .default = NA_character_
     ))
@@ -482,8 +549,8 @@ survey_filter_cd <- survey_filter_cd %>%
       # , .default = "neither"
     ))
     , difficulty_transport_expenses = as_factor(case_when(
-      q103 %in% c("Extremely difficult", "Somewhat difficult") ~ "yes"
-      , q103 %in% c("Extremely easy", "Somewhat easy") ~ "no"
+      q103 %in% c("Extremely difficult", "Somewhat difficult") ~ "Yes"
+      , q103 %in% c("Extremely easy", "Somewhat easy") ~ "No"
       , q103 %in% c("Neither easy nor difficult") ~ "neither"
       , .default = NA_character_
     ))
@@ -536,79 +603,79 @@ df_count <- df_count %>%
 df_count <- df_count %>% 
   mutate(
     last_7_stm_bus = as_factor(case_when(
-      str_detect(string = q21, pattern = "STM bus") ~ "yes"
+      str_detect(string = q21, pattern = "STM bus") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_metro = as_factor(case_when(
-      str_detect(string = q21, pattern = "Metro") ~ "yes"
+      str_detect(string = q21, pattern = "Metro") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_paratransit = as_factor(case_when(
-      str_detect(string = q21, pattern = "STM Paratransit") ~ "yes"
+      str_detect(string = q21, pattern = "STM Paratransit") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_other_bus = as_factor(case_when(
-      str_detect(string = q21, pattern = "Bus (not with the STM)") ~ "yes"
+      str_detect(string = q21, pattern = "Bus (not with the STM)") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_rail = as_factor(case_when(
-      str_detect(string = q21, pattern = "Commuter rail") ~ "yes"
+      str_detect(string = q21, pattern = "Commuter rail") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_walk = as_factor(case_when(
-      str_detect(string = q21, pattern = "Walking") ~ "yes"
+      str_detect(string = q21, pattern = "Walking") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_own_bike = as_factor(case_when(
-      str_detect(string = q21, pattern = "Own bike") ~ "yes"
+      str_detect(string = q21, pattern = "Own bike") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_own_scooter = as_factor(case_when(
-      str_detect(string = q21, pattern = "Own scooter") ~ "yes"
+      str_detect(string = q21, pattern = "Own scooter") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_service_bike = as_factor(case_when(
-      str_detect(string = q21, pattern = "Self-service bike") ~ "yes"
+      str_detect(string = q21, pattern = "Self-service bike") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_service_scooter = as_factor(case_when(
-      str_detect(string = q21, pattern = "Self-service scooter") ~ "yes"
+      str_detect(string = q21, pattern = "Self-service scooter") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_own_car = as_factor(case_when(
-      str_detect(string = q21, pattern = "Own car") ~ "yes"
+      str_detect(string = q21, pattern = "Own car") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_carpooling = as_factor(case_when(
-      str_detect(string = q21, pattern = "Carpooling") ~ "yes"
+      str_detect(string = q21, pattern = "Carpooling") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_carsharing = as_factor(case_when(
-      str_detect(string = q21, pattern = "Carsharing") ~ "yes"
+      str_detect(string = q21, pattern = "Carsharing") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_taxi = as_factor(case_when(
-      str_detect(string = q21, pattern = "Taxi") ~ "yes"
+      str_detect(string = q21, pattern = "Taxi") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
     , last_7_motorcycle = as_factor(case_when(
-      str_detect(string = q21, pattern = "Motorcycle") ~ "yes"
+      str_detect(string = q21, pattern = "Motorcycle") ~ "Yes"
       , q21 == "" ~ NA_character_
-      , .default = "no"
+      , .default = "No"
     ))
   )
   
@@ -627,7 +694,7 @@ df_count <- df_count %>%
 # df_count %>% 
 #   mutate(
 #     examples_stm_bus = case_when(
-#       last_7_stm_bus == "yes" &
+#       last_7_stm_bus == "Yes" &
 #         (mode_stm_bus_dest_work %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_work)) |
 #         (mode_stm_bus_dest_school %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_school)) |
 #         (mode_stm_bus_dest_food %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_food)) |
@@ -638,7 +705,7 @@ df_count <- df_count %>%
 #         (mode_stm_bus_dest_community_events %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_community_events)) |
 #         (mode_stm_bus_dest_accompany %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_accompany)) |
 #         (mode_stm_bus_dest_volunteer %nin% c(0L, -99L) | !is.na(mode_stm_bus_dest_volunteer)) ~ "example_a"
-#       , last_7_stm_bus == "yes" &
+#       , last_7_stm_bus == "Yes" &
 #         (mode_stm_bus_dest_work %in% c(0L, -99L) | is.na(mode_stm_bus_dest_work)) |
 #         (mode_stm_bus_dest_school %in% c(0L, -99L) | is.na(mode_stm_bus_dest_school)) |
 #         (mode_stm_bus_dest_food %in% c(0L, -99L) | is.na(mode_stm_bus_dest_food)) |
@@ -656,85 +723,85 @@ df_count <- df_count %>%
 # # or check using filter
 # 
 # df_count %>% 
-#   filter(last_7_stm_bus=="yes") %>% 
+#   filter(last_7_stm_bus=="Yes") %>% 
 #   select(v1,contains("mode_stm_bus")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_metro=="yes") %>% 
+#   filter(last_7_metro=="Yes") %>% 
 #   select(v1,contains("mode_metro")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_paratransit=="yes") %>% 
+#   filter(last_7_paratransit=="Yes") %>% 
 #   select(v1,contains("mode_paratransit")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_other_bus=="yes") %>% 
+#   filter(last_7_other_bus=="Yes") %>% 
 #   select(v1,contains("mode_other_bus")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_rail=="yes") %>% 
+#   filter(last_7_rail=="Yes") %>% 
 #   select(v1,contains("mode_rail")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_own_bike=="yes") %>% 
+#   filter(last_7_own_bike=="Yes") %>% 
 #   select(v1,contains("mode_own_bike")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_service_bike=="yes") %>% 
+#   filter(last_7_service_bike=="Yes") %>% 
 #   select(v1,contains("mode_service_bike")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_own_scooter=="yes") %>% 
+#   filter(last_7_own_scooter=="Yes") %>% 
 #   select(v1,contains("mode_own_scooter")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_service_scooter=="yes") %>% 
+#   filter(last_7_service_scooter=="Yes") %>% 
 #   select(v1,contains("mode_service_scooter")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_own_car=="yes") %>% 
+#   filter(last_7_own_car=="Yes") %>% 
 #   select(v1,contains("mode_own_car")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_carpooling=="yes") %>% 
+#   filter(last_7_carpooling=="Yes") %>% 
 #   select(v1,contains("mode_carpooling")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_carsharing=="yes") %>% 
+#   filter(last_7_carsharing=="Yes") %>% 
 #   select(v1,contains("mode_carsharing")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_taxi=="yes") %>% 
+#   filter(last_7_taxi=="Yes") %>% 
 #   select(v1,contains("mode_taxi")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
 # 
 # df_count %>% 
-#   filter(last_7_motorcycle=="yes") %>% 
+#   filter(last_7_motorcycle=="Yes") %>% 
 #   select(v1,contains("mode_motorcycle")) %>% 
 #   filter(if_all(where(is.numeric), ~ . %in% c(0L, -99L) | is.na(.)) ) %>% 
 #   nrow()
@@ -930,8 +997,6 @@ df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(v1
     , "df_main_trip_type" = df_main_trip_type
   )
   
-
-  
   return(lista)
 }
 
@@ -950,14 +1015,53 @@ survey_filter_cd <- survey_filter_cd %>%
   dplyr::left_join(l_trips$df_main_trip_type %>% select(v1,main_type))
 ```
 
+### Recode factor levels
 
+```{r factorlevels}
+lvls_yes_no <- c("No", "Yes")
+lvls_vis_minority <- c("Non-visible minority"
+                       ,"Native NA origins"
+                       ,"Visible minority")
+lvls_employment <- c(
+  "Employed full-time"
+  , "Retired"
+  , "Employed part-time"
+  , "Other"
+  , "Unemployed"
+)
 
-```{r factorrelevel}
+lvls_when <- c("Within last week", "Previous than last week")
 
+lvls_suppressed_alt <- c(
+  "Active", "Car", "Suppressed trip", "Other"
+)
+
+lvls_satisfied <- c("satisfied", "dissatisfied", "neither")
 ```
 
 
-```{r codemissingsurvey}
+```{r recodefactorrelevel}
+survey_filter_cd <- survey_filter_cd %>% 
+  mutate(
+    across(
+      c(in_lim, educ_has_postsec, lone_household, employed, unemployed, immigrant
+        , any_functional_limitation, any_mobility_limitation
+        , firstnations_metis_inuit, transit_once_week_plus, last_7_mode_transit
+        , last_7_mode_car, last_7_mode_active, awereness_free_pas65
+        , has_free_pass, rides_transit_as_would_like, has_cost_prevented_transit
+        , confident_transit, satisfied_transit
+        , difficulty_transport_expenses
+        )
+      , ~forcats::fct_relevel(.x, lvls_yes_no)
+      )
+    , across(starts_with("^transit_barrier"), ~forcats::fct_relevel(.x, lvls_yes_no))
+    , across(starts_with("suppresed_dest"), ~forcats::fct_relevel(.x, lvls_yes_no))
+    , visible_minority = fct_relevel(visible_minority, lvls_vis_minority)
+    , employment = fct_relevel(employment, lvls_employment)
+    , when_cost_transport_barrier = fct_relevel(when_cost_transport_barrier, lvls_when)
+    , across(starts_with("^satisfaction"), ~fct_relevel(.x, lvls_satisfied))
+    )
+
 
 ```
 
@@ -1010,6 +1114,7 @@ montreal_cd_ct <- montreal_cd_ct %>%
 ```{r}
 sf::st_write(montreal_cd_ct, "data/report/montreal_cd_ct_count.gpkg", append = F)
 sf::st_write(montreal_fsa, "data/report/montreal_fsa_count.gpkg", append = F)
-sf::st_write(survey_filter_cd_fsa, "data/report/survey_filter_inside_cd.gpkg",
+sf::st_write(survey_filter_cd, "data/report/survey_filter_inside_cd.gpkg",
              append = F)
+save(l_trips, file = "data/list_count_trips.RData")
 ```
