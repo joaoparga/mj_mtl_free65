@@ -252,6 +252,11 @@ survey_filter_cd <- survey_filter_cd %>%
       , q39 == "4+" ~ 4/household_size
       , .default = NA_integer_
     )
+    , has_vehicle_household = as_factor(case_when(
+      q39 == "0" ~ "No"
+      , q39 == "Prefer not to answer" ~ NA_character_
+      , .default = "Yes"
+    ))
     # check if "" means skipped or 
     , lone_household = as_factor(case_when(
       household_size == 1 ~ "Yes"
@@ -499,59 +504,59 @@ survey_filter_cd <- survey_filter_cd %>%
     , confident_transit = as_factor(case_when(
       q102_5 %in% c("Agree", "Strongly Agree") ~ "Yes"
       , q102_5 %in% c("Disagree", "Strongly Disagree") ~ "No"
-      , q102_5 %in% c("Neither agree nor disagree") ~ "neither"
+      , q102_5 %in% c("Neither agree nor disagree") ~ "Neither"
       , .default = NA_character_
     ))
     , satisfied_transit = as_factor(case_when(
       q109_1 %in% c("Agree", "Strongly Agree") ~ "Yes"
       , q109_1 %in% c("Disagree", "Strongly Disagree") ~ "No"
-      , q109_1 %in% c("Neither agree nor disagree") ~ "neither"
+      , q109_1 %in% c("Neither agree nor disagree") ~ "Neither"
       , .default = NA_character_
     ))
     , satisfaction_seeing_friends_family = as_factor(case_when(
-      q109_3 %in% c("Agree", "Strongly Agree") ~ "satisfied"
-      , q109_3 %in% c("Disagree", "Strongly Disagree") ~ "dissatisfied"
+      q109_3 %in% c("Agree", "Strongly Agree") ~ "Satisfied"
+      , q109_3 %in% c("Disagree", "Strongly Disagree") ~ "Dissatisfied"
       , q109_3 %in% c("", "Prefer not to answer", "Not applicable") ~ NA_character_
-      , .default = "neither"
+      , .default = "Neither"
     ))
     , satisfaction_recreation = as_factor(case_when(
-      q109_4 %in% c("Agree", "Strongly Agree") ~ "satisfied"
-      , q109_4 %in% c("Disagree", "Strongly Disagree") ~ "dissatisfied"
+      q109_4 %in% c("Agree", "Strongly Agree") ~ "Satisfied"
+      , q109_4 %in% c("Disagree", "Strongly Disagree") ~ "Dissatisfied"
       , q109_4 %in% c("", "Prefer not to answer", "Not applicable") ~ NA_character_
-      , .default = "neither"
+      , .default = "Neither"
     ))
     , satisfaction_community_events = as_factor(case_when(
-      q109_5 %in% c("Agree", "Strongly Agree") ~ "satisfied"
-      , q109_5 %in% c("Disagree", "Strongly Disagree") ~ "dissatisfied"
+      q109_5 %in% c("Agree", "Strongly Agree") ~ "Satisfied"
+      , q109_5 %in% c("Disagree", "Strongly Disagree") ~ "Dissatisfied"
       , q109_5 %in% c("", "Prefer not to answer", "Not applicable") ~ NA_character_
-      , .default = "neither"
+      , .default = "Neither"
     ))
     , satisfaction_activity_participation = as_factor(case_when(
-      satisfaction_seeing_friends_family == "satisfied" &
-        satisfaction_recreation == "satisfied" &
-        satisfaction_community_events == "satisfied" ~ "satisfied"
-      , satisfaction_seeing_friends_family == "dissatisfied" |
-        satisfaction_recreation == "dissatisfied" |
-        satisfaction_community_events == "dissatisfied" ~ "dissatisfied"
+      satisfaction_seeing_friends_family == "Satisfied" &
+        satisfaction_recreation == "Satisfied" &
+        satisfaction_community_events == "Satisfied" ~ "Satisfied"
+      , satisfaction_seeing_friends_family == "Dissatisfied" |
+        satisfaction_recreation == "Dissatisfied" |
+        satisfaction_community_events == "Dissatisfied" ~ "Dissatisfied"
       , is.na(satisfaction_seeing_friends_family) &
         is.na(satisfaction_recreation) &
         is.na(satisfaction_community_events) ~ NA_character_
-      , .default = "neither"
+      , .default = "Neither"
       # q109_3 %in% c("Agree", "Strongly Agree") &
       #   q109_4 %in% c("Agree", "Strongly Agree") &
-      #   q109_5 %in% c("Agree", "Strongly Agree") ~ "satisfied"
+      #   q109_5 %in% c("Agree", "Strongly Agree") ~ "Satisfied"
       # , q109_3 %in% c("Disagree", "Strongly Disagree") |
       #   q109_4 %in% c("Disagree", "Strongly Disagree") |
-      #   q109_5 %in% c("Disagree", "Strongly Disagree") ~ "dissatisfied"
+      #   q109_5 %in% c("Disagree", "Strongly Disagree") ~ "Dissatisfied"
       # , q109_3 %in% c("", "Prefer not to answer","Not applicable") &
       #   q109_4 %in% c("", "Prefer not to answer","Not applicable") &
       #   q109_5 %in% c("", "Prefer not to answer","Not applicable") ~ NA_character_
-      # , .default = "neither"
+      # , .default = "Neither"
     ))
     , difficulty_transport_expenses = as_factor(case_when(
       q103 %in% c("Extremely difficult", "Somewhat difficult") ~ "Yes"
       , q103 %in% c("Extremely easy", "Somewhat easy") ~ "No"
-      , q103 %in% c("Neither easy nor difficult") ~ "neither"
+      , q103 %in% c("Neither easy nor difficult") ~ "Neither"
       , .default = NA_character_
     ))
     , follow_up = as_factor(case_when(
@@ -1036,7 +1041,7 @@ lvls_suppressed_alt <- c(
   "Active", "Car", "Suppressed trip", "Other"
 )
 
-lvls_satisfied <- c("satisfied", "dissatisfied", "neither")
+lvls_satisfied <- c("Satisfied", "Dissatisfied", "Neither")
 ```
 
 
@@ -1044,9 +1049,12 @@ lvls_satisfied <- c("satisfied", "dissatisfied", "neither")
 survey_filter_cd <- survey_filter_cd %>% 
   mutate(
     across(
-      c(in_lim, educ_has_postsec, lone_household, employed, unemployed, immigrant
+      c(in_lim, educ_has_postsec, lone_household, employed, unemployed
+        , immigrant
         , any_functional_limitation, any_mobility_limitation
-        , firstnations_metis_inuit, transit_once_week_plus, last_7_mode_transit
+        , firstnations_metis_inuit 
+        , has_vehicle_household
+        , transit_once_week_plus, last_7_mode_transit
         , last_7_mode_car, last_7_mode_active, awereness_free_pas65
         , has_free_pass, rides_transit_as_would_like, has_cost_prevented_transit
         , confident_transit, satisfied_transit

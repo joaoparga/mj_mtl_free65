@@ -632,7 +632,7 @@ cd_pop_fsa = sum(montreal_fsa$total_age, na.rm = T)
 montreal_fsa <- montreal_fsa %>% 
   dplyr::mutate(
     age_50_over_tot = age_50_54_tot + age_55_59_tot + age_60_64_tot + age_65_over_tot
-    , prop_age_65_over_tot = age_50_over_tot / cd_pop_fsa
+    , prop_age_50_over_tot = age_50_over_tot / cd_pop_fsa
   )
 ```
 
@@ -654,10 +654,10 @@ montreal_fsa <- montreal_fsa %>%
 # get census natural breaks
 # plot spatial distributions
 montreal_fsa %>% 
-  mutate(prop_age_65_over_tot = na_if(prop_age_65_over_tot, 0L)) %>% 
+  mutate(prop_age_50_over_tot = na_if(prop_age_50_over_tot, 0L)) %>% 
   tm_shape() + 
   tm_polygons(
-    col = "prop_age_65_over_tot"
+    col = "prop_age_50_over_tot"
     , style = "jenks"
     , palette = "YlOrBr"
     , border.alpha = 0.25
@@ -667,7 +667,7 @@ montreal_fsa %>%
 montreal_fsa <- montreal_fsa %>%
    mutate(
      intervals_age_50_over = cut(
-       prop_age_65_over_tot
+       prop_age_50_over_tot
        , breaks = c(0, 0.002, 0.004, 0.006, 0.007, 0.01, Inf)
        )
      , intervals_survey = cut(
@@ -681,7 +681,7 @@ tmfsa_census <- tm_shape(montreal_fsa) +
      col = "intervals_age_50_over"
      , palette = "YlOrBr"
      , border.alpha = 0.25
-     , title = "prop_age_65_over_tot"
+     , title = "prop_age_50_over_tot"
      )
 
 tmfsa_survey <- tm_shape(montreal_fsa) +
@@ -837,7 +837,7 @@ tmap_save(
 f_under_over <- function(df){
   df <- df %>% 
     # create under_over var
-    mutate(under_over = prop_survey / prop_age_65_over_tot)
+    mutate(under_over = prop_survey / prop_age_50_over_tot)
   
     # create labels
   df <- df %>% 
@@ -846,11 +846,11 @@ f_under_over <- function(df){
       prop_survey %>% round(3)
       , "<br>"
       , "("
-      , prop_age_65_over_tot %>% round(3)
+      , prop_age_50_over_tot %>% round(3)
       , ")"
       )
     , label_survey = as.character(prop_survey %>% round(3))
-    , label_census = paste0("(", prop_age_65_over_tot %>% round(3), ")")
+    , label_census = paste0("(", prop_age_50_over_tot %>% round(3), ")")
     )
 }
 
