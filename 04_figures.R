@@ -16,11 +16,13 @@ library(mapview)
 library(conflicted)
 library(stars)
 library(showtext)
+library(sysfonts)
 
 
 # remove conflict
-select <- dplyr::select
+# select <- dplyr::select
 
+conflicted::conflict_prefer(dplyr::select)
 conflicts_prefer(dplyr::filter)
 
 # use different fonts

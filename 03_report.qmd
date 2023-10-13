@@ -16,6 +16,8 @@ format:
     theme: readable
     embed-resources: true
   pdf:
+    fig-width: 6
+    fig-asp: 0.618
     number-sections: true
     colorlinks: true
     keeptex: true
@@ -76,6 +78,23 @@ library(modelsummary)
 library(kableExtra)
 library(knitr)
 library(gt)
+library(conflicted)
+library(stars)
+library(showtext)
+library(sysfonts)
+```
+
+```{r conflicts}
+#| include: false
+select <- dplyr::select
+conflicted::conflicts_prefer(dplyr::filter)
+```
+
+```{r fonts}
+#| include: false
+#| # use different fonts
+sysfonts::font_add_google("Roboto", "roboto")
+showtext::showtext_auto()
 ```
 
 
@@ -88,10 +107,12 @@ montreal_fsa <- sf::st_read("data/report/montreal_fsa_count.gpkg")
 # montreal cd (ct)
 montreal_cd_ct <- sf::st_read("data/report/montreal_cd_ct_count.gpkg")
 # survey raw data
-survey_raw <- data.table::fread("data/utscfiletransfer/Montreal_Corrected_Geocoding_2023_09_18.csv")
-survey_raw <- janitor::clean_names(survey_raw)
+n_obs_survey_raw <- data.table::fread("data/utscfiletransfer/Montreal_Corrected_Geocoding_2023_09_18.csv") %>% 
+  nrow()
 # survey geocoded
-survey_sf <- sf::st_read("data/df_survey_montreal_filter_sf_new.gpkg")
+n_obs_survey_geocoded <- 
+  sf::st_read("data/df_survey_montreal_filter_sf_new.gpkg") %>% 
+  nrow()
 # survey filtered data
 survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
 ```
@@ -103,26 +124,87 @@ survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
 
 # Initial information
 
-The raw dataset contained `r nrow(survey_raw)` respondents, of which we were able to geocode `r nrow(survey_sf)` observations.
-`r nrow(survey_sf)-nrow(survey_filter_cd)` of them declared their residential location outside a 250 meter buffer around the island of Montreal (`CD == 2466`), leaving us with `r nrow(survey_filter_cd)` observations in the final dataset.
+The original raw dataset contained `r n_obs_survey_raw` respondents, of which we were able to geocode `r n_obs_survey_geocoded` observations.
+`r n_obs_survey_geocoded - nrow(survey_filter_cd)` of them declared their residential location outside a 250 meter buffer around the island of Montreal (`CD == 2466`), leaving us with `r nrow(survey_filter_cd)` observations in the final dataset.
 
 # Spatial distribution {#sec-spatial}
+
+```{r}
+#| include: false
+fsa <- montreal_fsa %>% 
+  select(geouid) %>% 
+  rename("fsa_geouid" = "geouid")
+ct <- montreal_cd_ct %>% 
+  select(geo_uid, count_lim_tot_parent, count_lim_tot_in_lim) %>% 
+  rename("ct_geo_uid" = "geo_uid")
+
+fsa_ct_join <- sf::st_join(fsa, ct)
+
+total_lim_sum <- sum(montreal_cd_ct$count_lim_tot_parent)
+
+fsa_ct_grouped <- fsa_ct_join %>% 
+  group_by(fsa_geouid) %>% 
+  summarise(
+    sum_lim_tot_parent = sum(count_lim_tot_parent, na.rm = T)
+    , sum_lim_tot_in_lim = sum(count_lim_tot_in_lim, na.rm = T)
+    , prop_tot_pop = sum_lim_tot_parent / total_lim_sum
+    , prop_tot_in_lim = sum_lim_tot_in_lim / total_lim_sum
+  )
+```
+
 
 ## Over 50 years 
 Below, we plot the spatial distribution of the sample against the spatial distribution of the population over 50 years old, according to the 2021 Census.
 We see that the survey over represents on the eastern part of the island, and somewhat in its center. 
 The CTs that are under represented are located in the western part.
 
-```{r, fig.align="center", fig.pos="H"}
+```{r, fig.align="center", fig.pos="H", fig.cap=c("Population in LIM (Census)", "Under/over-representation ratio of survey respondents vs. population over 50")}
 #| label: map-1-under-over-fsa
-#| fig-cap: "Under/over-representation: Ratio of the proportions of survey respondents vs. the population over 50 in each FSA (left)"
 #| out-width: 100%
+#| fig-format: pdf
+#| fig-asp: 1
+#| layout-ncol: 2
+
+# quarto figures
+# https://r4ds.hadley.nz/quarto.html
+# plot scaling
+# https://quarto.org/docs/reference/cells/cells-knitr.html
+# multiple plots and captions
+# https://stackoverflow.com/a/41231696
+
+# fig-cap: "Under/over-representation: Ratio of the proportions of survey respondents vs. the population over 50 in each FSA (left)"
+
+tm_shape(fsa_ct_grouped) +
+  tm_polygons(
+    col = "prop_tot_in_lim"
+    , style = "jenks"
+    , palette = "YlGnBu"
+    , border.alpha = 0.5
+    , alpha = 0.95
+    , title = "Proportion of Residents in LIM (relative to total population)"
+  ) + 
+  tm_layout(
+    legend.width = 2
+    # , main.title = "Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
+    # , main.title.position = "center"
+    # , main.title.size = 1.05
+    , legend.title.size = 1.5
+    , legend.text.size = 1
+    , fontfamily = "roboto"
+  ) +
+  tm_compass(color.dark = "grey30", text.color = "grey30") +
+  tm_scale_bar(
+    breaks = c(0,2)
+    , color.dark = "grey30"
+    , text.color = "grey30"
+    , position = "left"
+    )
 
 tm_shape(montreal_fsa) + 
   tm_polygons(
     col = "under_over"
     , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
-    , palette = "BrBG"
+    , palette = "RdBu"
     , border.alpha = 0.25
     , alpha = 0.95
     , labels = c("0.00-0.50: Survey underrepresents","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Survey overrepresents')
@@ -150,69 +232,16 @@ tm_shape(montreal_fsa) +
     # , main.title.size = 1.05
     , legend.title.size = 1.2
     , legend.text.size = 0.8
-  )
-
-# tmap_arrange(tm_under_over_fsa, tm_under_over_ct)
-```
-```{r, fig.align="center", fig.pos="H"}
-#| label: map-2-under-over-ct
-#| fig-cap: "Under/over-representation: Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
-#| out-width: 100%
-
-# tm_under_over_ct <- 
-  tm_shape(montreal_cd_ct) + 
-  tm_polygons(
-    col = "under_over"
-    , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
-    , palette = "BrBG"
-    , border.alpha = 0.5
-    , alpha = 0.95
-    , labels = c("0.00-0.50: Survey underrepresents","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Survey overrepresents')
-    , title = "Ratio: Survey/(Census)"
-  ) + 
-  tm_add_legend(
-    type = "text"
+    , fontfamily = "roboto"
   ) +
-  tm_layout(
-    legend.width = 2
-    # , main.title = "Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
-    # , main.title.position = "center"
-    # , main.title.size = 1.05
-    , legend.title.size = 1.2
-    , legend.text.size = 0.8
-  )
+  tm_compass(color.dark = "grey30", text.color = "grey30") +
+  tm_scale_bar(breaks = c(0,2), color.dark = "grey30", text.color = "grey30"
+               , position = "left")
 
 # tmap_arrange(tm_under_over_fsa, tm_under_over_ct)
 ```
 
 
-## In LIM
-
-![InLIM](map_in_lim.png){width=100%}
 
 # Table
-
-```{r}
-#| include: false
-
-proportions <- tibble(
-  prop_lim_census = sum(montreal_cd_ct$count_lim_tot_in_lim, na.rm = T) /
-    sum(montreal_cd_ct$count_lim_tot_parent, na.rm = T)
-  , prop_lim_survey = survey_filter_cd %>% filter(in_lim=="yes") %>% nrow() /
-    survey_filter_cd %>% nrow()
-  , prop_vis_minority_census = sum(montreal_cd_ct$tot_vis_minority_tot, na.rm = T) /
-    sum(montreal_cd_ct$tot_vis_minority_tot_parent, na.rm = T)
-  , prop_vis_minority_survey = survey_filter_cd %>% filter(visible_minority=="visible_minority") %>% nrow() /
-    survey_filter_cd %>% nrow()
-)
-
-
-```
-
-```{r}
-proportions %>% gt::gt() %>% 
-   gt::fmt_percent(
-    decimals = 1
-  )
-```
 

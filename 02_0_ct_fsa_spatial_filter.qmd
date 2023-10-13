@@ -850,7 +850,9 @@ f_under_over <- function(df){
       , ")"
       )
     , label_survey = as.character(prop_survey %>% round(3))
+    , label_survey_pct = as.character(round(prop_survey * 100, 2))
     , label_census = paste0("(", prop_age_50_over_tot %>% round(3), ")")
+    , label_census_pct = paste0("(", round(prop_age_50_over_tot * 100, 2), ")")
     )
 }
 
