@@ -7,6 +7,11 @@ author:
     affiliations:
       - name: Mobilizing Justice Partnership
 format:
+  docx: 
+    reference-doc: custom-reference-doc.docx
+    toc: false
+    toc-depth: 2
+    number-sections: true
   html:
     toc: true
     toc_float: true
@@ -32,9 +37,9 @@ format:
             table-align-text-pre=false,
             table-align-text-post=false
          ]}
-date: 'last-modified'
+date: "last-modified"
 date-format: '[This version:] MMMM D, YYYY'
-abstract: 'This report provides an overview of the first wave of the Montreal Fair Pass Survey.'
+abstract: "This report overviews the first wave of the Montreal Fair Pass Survey's data. The survey's spatial representation generally coincides with areas that concentrate populations from low-income groups. Individuals from low-income households appear to be over-represented in the survey as a whole (13 p.p. difference from the census data), Visible minorities, on the other hand, appear to be under-represented (29 p.p. difference). Other groups, such as women and man, and control (50 to 64 years old) and treatment (above 65 years old), showed no significant difference in representation. The code used to produce this report is found on the project's [github repository](https://github.com/joaoparga/mj_fair_pass). "
 bibliography: bib/zoterolibrary_updated_10_05_23.bib
 csl: csl/american-sociological-association.csl
 tbl-cap-location: top
@@ -125,9 +130,9 @@ survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
 # Initial information
 
 The original raw dataset contained `r n_obs_survey_raw` respondents, of which we were able to geocode `r n_obs_survey_geocoded` observations.
-`r n_obs_survey_geocoded - nrow(survey_filter_cd)` of them declared their residential location outside a 250 meter buffer around the island of Montreal (`CD == 2466`), leaving us with `r nrow(survey_filter_cd)` observations in the final dataset.
+`r n_obs_survey_geocoded - nrow(survey_filter_cd)` of them declared their residential location outside a 250 meter buffer around the island of Montreal (Census Division code equals to 2466), leaving us with `r nrow(survey_filter_cd)` observations in the final dataset.
 
-# Spatial distribution {#sec-spatial}
+# Survey's representation {#sec-spatial}
 
 ```{r}
 #| include: false
@@ -152,11 +157,57 @@ fsa_ct_grouped <- fsa_ct_join %>%
   )
 ```
 
+## Demographics 
 
-## Over 50 years 
-Below, we plot the spatial distribution of the sample against the spatial distribution of the population over 50 years old, according to the 2021 Census.
-We see that the survey over represents on the eastern part of the island, and somewhat in its center. 
-The CTs that are under represented are located in the western part.
+```{r}
+obssurvey <- survey_filter_cd %>% nrow()
+
+census_age_sums <- montreal_cd_ct %>% 
+  st_drop_geometry() %>% 
+  select(matches("^age_(50_over|50_64|65_over)")) %>% 
+  summarise(across(everything(), ~ sum(., na.rm = T)))
+  
+
+df_representation <- tibble(
+  prop_lim_census = sum(montreal_cd_ct$count_lim_tot_in_lim, na.rm = T) /
+    sum(montreal_cd_ct$count_lim_tot_parent, na.rm = T)
+  , prop_lim_survey = survey_filter_cd %>% filter(in_lim=="Yes") %>% nrow() /
+    obssurvey
+  , prop_vis_minority_census = sum(montreal_cd_ct$tot_vis_minority_tot, na.rm = T) /
+    sum(montreal_cd_ct$tot_vis_minority_tot_parent, na.rm = T)
+  , prop_vis_minority_survey = survey_filter_cd %>% filter(visible_minority=="Visible minority") %>% nrow() /
+    obssurvey
+  , prop_male_census = sum(montreal_cd_ct$male_tot, na.rm = T) / sum(montreal_cd_ct$total_tot, na.rm = T)
+  , prop_male_survey = survey_filter_cd %>% filter(gender=="male") %>% nrow() / obssurvey
+  , prop_female_census = sum(montreal_cd_ct$female_tot, na.rm = T) / sum(montreal_cd_ct$total_tot, na.rm = T)
+  , prop_female_survey = survey_filter_cd %>% filter(gender=="female") %>% nrow() / obssurvey
+  , prop_age_50_64_tot_census = census_age_sums$age_50_64_tot / census_age_sums$age_50_over_tot
+  , prop_age_50_64_tot_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Control (50-64)") %>% nrow() / obssurvey
+  , prop_age_50_64_mal_census = census_age_sums$age_50_64_mal / census_age_sums$age_50_over_mal
+  , prop_age_50_64_mal_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Control (50-64)" & gender=="male") %>% nrow() / survey_filter_cd %>% filter(gender=="male") %>% nrow()
+  , prop_age_50_64_fem_census = census_age_sums$age_50_64_fem / census_age_sums$age_50_over_fem
+  , prop_age_50_64_fem_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Control (50-64)" & gender=="female") %>% nrow() / survey_filter_cd %>% filter(gender=="female") %>% nrow()
+  , prop_age_65_over_tot_census = census_age_sums$age_65_over_tot / census_age_sums$age_50_over_tot
+  , prop_age_65_over_tot_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)") %>% nrow() / obssurvey
+  , prop_age_65_over_mal_census = census_age_sums$age_65_over_mal / census_age_sums$age_50_over_mal
+  , prop_age_65_over_mal_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)" & gender=="male") %>% nrow() / survey_filter_cd %>% filter(gender=="male") %>% nrow()
+  , prop_age_65_over_fem_census = census_age_sums$age_65_over_fem / census_age_sums$age_50_over_fem
+  , prop_age_65_over_fem_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)" & gender=="female") %>% nrow() / survey_filter_cd %>% filter(gender=="female") %>% nrow()
+  
+  # , prop_age_65_over_tot_census = census_age_sums$age_65_over_tot / census_age_sums$age_50_over_tot
+  # , prop_age_65_over_tot__survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)") %>% nrow() / obssurvey
+) %>% 
+  map_df(~round(., 2))
+```
+
+
+## Spatial 
+The two maps below give an overview of the spatial representation of survey. 
+The map on the left shows how the relative participation of the population below the Low Income Measure is spatially distributed in the Island of Montreal according to the 2021 Census. 
+It seems clear that this group, which constitutes part of the target audience of the fare-free policy, are spatially concentrated on the eastern and northern parts of the island.
+The map on the right complements the former, showing the under and over-representation of the survey against the population over 50 years old according to the census.
+The survey's over-representation appears to be located on the regions that concentrate groups from low-income households, while under-representation occurs on less-populated and regions with low participation of the equity deserving groups from an income's perspective.
+
 
 ```{r, fig.align="center", fig.pos="H", fig.cap=c("Population in LIM (Census)", "Under/over-representation ratio of survey respondents vs. population over 50")}
 #| label: map-1-under-over-fsa
@@ -181,7 +232,7 @@ tm_shape(fsa_ct_grouped) +
     , palette = "YlGnBu"
     , border.alpha = 0.5
     , alpha = 0.95
-    , title = "Proportion of Residents in LIM (relative to total population)"
+    , title = "Proportion of Residents in LIM"
   ) + 
   tm_layout(
     legend.width = 2
@@ -205,23 +256,23 @@ tm_shape(montreal_fsa) +
     col = "under_over"
     , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
     , palette = "RdBu"
-    , border.alpha = 0.25
+    , border.alpha = 0.5
     , alpha = 0.95
     , labels = c("0.00-0.50: Survey underrepresents","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Survey overrepresents')
     , title = "Ratio: Survey/(Census)"
     ) + 
-  tm_text(
-    text = "label_survey"
-    , size = 0.3
-    # , col = "white"
-    ) + 
-  tm_shape(montreal_fsa) +
-  tm_text(
-      text = "label_census"
-      , size = 0.3
-      , ymod = -0.25
-      # , col = "black"
-  ) +
+  # tm_text(
+  #   text = "label_survey"
+  #   , size = 0.3
+  #   # , col = "white"
+  #   ) + 
+  # tm_shape(montreal_fsa) +
+  # tm_text(
+  #     text = "label_census"
+  #     , size = 0.3
+  #     , ymod = -0.25
+  #     # , col = "black"
+  # ) +
   tm_add_legend(
     type = "text"
   ) +
@@ -230,8 +281,8 @@ tm_shape(montreal_fsa) +
     # , main.title = "Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
     # , main.title.position = "center"
     # , main.title.size = 1.05
-    , legend.title.size = 1.2
-    , legend.text.size = 0.8
+    , legend.title.size = 1.5
+    , legend.text.size = 1
     , fontfamily = "roboto"
   ) +
   tm_compass(color.dark = "grey30", text.color = "grey30") +
