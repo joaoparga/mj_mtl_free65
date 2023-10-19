@@ -87,6 +87,7 @@ library(conflicted)
 library(stars)
 library(showtext)
 library(sysfonts)
+library(hrbrthemes)
 ```
 
 ```{r conflicts}
@@ -130,11 +131,11 @@ survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
 # Initial information
 
 The original raw dataset contained `r n_obs_survey_raw` respondents, of which we were able to geocode `r n_obs_survey_geocoded` observations.
-`r n_obs_survey_geocoded - nrow(survey_filter_cd)` of them declared their residential location outside a 250 meter buffer around the island of Montreal (Census Division code equals to 2466), leaving us with `r nrow(survey_filter_cd)` observations in the final dataset.
+`r n_obs_survey_geocoded - nrow(survey_filter_cd)` of them declared their residential location outside a 250 meter buffer around the island of Montreal (Census Division code equals to 2466), leaving us with `r nrow(survey_filter_cd)` respondents within the borders of the island and, therefore, in the final dataset.
 
 # Survey's representation {#sec-spatial}
 
-```{r}
+```{r aggregateresultsfsa}
 #| include: false
 fsa <- montreal_fsa %>% 
   select(geouid) %>% 
@@ -159,7 +160,18 @@ fsa_ct_grouped <- fsa_ct_join %>%
 
 ## Demographics 
 
-```{r}
+The plot below shows comparisons of the survey's representation according to selected demographics.
+Categories where the [red dot]{style="color: red;"} is on the right mean under-representation of the survey (i.e., the census' relative population of a given group is greater than the survey's), while categories where the blue dot is on the right equal over-representation of the survey (i.e., the survey's relative population of a given group is greater than the census').
+The survey, then, over-represents for women, the control group (50-64 years old), and people within the Low-income measure, and under-representation occurs for men, the treatment group (65 years or older), and visible minorities.
+
+Differences in representation appear to be insignificant for the most groups, with the notable exception of Low-income and Visible Minorities.
+The former has a 13 p.p. over-representation, while the latter is under represented by 29 p.p..
+These differences put into question MJ's capacity to assess the policy's effectiveness for visible minorities, given their under-representation on the survey.
+This is an unfortunate situation, considering those are historically and structurally marginalized groups that suffer disproportionately with transport poverty and transport-related social exclusion, and that these groups would be target audiences for a policy that reduces the monetary burden of transportation such as the fare-free pass program.
+
+
+```{r createcomptable}
+#| include: false
 obssurvey <- survey_filter_cd %>% nrow()
 
 census_age_sums <- montreal_cd_ct %>% 
@@ -198,7 +210,98 @@ df_representation <- tibble(
   # , prop_age_65_over_tot__survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)") %>% nrow() / obssurvey
 ) %>% 
   map_df(~round(., 2))
+
+df_representation_t <- df_representation %>%
+  pivot_longer(everything()) %>% 
+  separate_wider_regex(
+    cols = name
+    , c("prop_", Category = ".*", "_", Source = "(?:census|survey)")
+  ) %>% 
+  rename(Proportion = value) %>% 
+  mutate(
+    Category = case_when(
+      Category == "lim" ~ "In LIM"
+      , Category == "vis_minority" ~ "Visible Minority"
+      , Category == "male" ~ "Gender: Male"
+      , Category == "female" ~ "Gender: Female"
+      , Category == "age_50_64_tot" ~ "Age 50-64 (Total)"
+      , Category == "age_50_64_mal" ~ "Age 50-64 (Male)"
+      , Category == "age_50_64_fem" ~ "Age 50-64 (Female)"
+      , Category == "age_65_over_tot" ~ "Age 65+ (Total)"
+      , Category == "age_65_over_mal" ~ "Age 65+ (Male)"
+      , Category == "age_65_over_fem" ~ "Age 65+ (Female)"
+      , .default = "error"
+    )
+    , Source = case_when(
+      Source == "census" ~ "Census"
+      , .default = "Survey"
+    )
+  ) %>% 
+  arrange(Proportion, Source) %>% 
+  mutate(Category = as_factor(Category))
+
 ```
+
+```{r, fig.align="center", fig.pos="H", fig.cap="Proportion of respondents by Source and Demographics"}
+#| echo: false
+#| label: fig-1-demographics-census-survey
+#| out-width: 100%
+#| fig-format: pdf
+#| fig-asp: 0.7
+#| fig-width: 7
+df_right_label <- df_representation_t %>% 
+  group_by(Category) %>% 
+  arrange(desc(Proportion)) %>% 
+  top_n(1) %>% 
+  mutate(pct = scales::percent(Proportion))
+
+df_left_label <- df_representation_t %>% 
+  group_by(Category) %>% 
+  arrange(desc(Proportion)) %>% 
+  slice(2) %>% 
+  mutate(pct = scales::percent(Proportion))
+
+df_representation_t %>% 
+  mutate(Category = factor(Category, levels = rev(df_right_label$Category))) %>% 
+  # arrange(Proportion, Source) %>% 
+  # mutate(Category = factor(Category)) 
+# %>% 
+  ggplot(aes(x = Proportion, y = Category)) +
+  geom_line(aes(group = Category), colour = "darkgrey") +
+  geom_point(aes(color = Source), size = 3) +
+  geom_text(
+    data = df_right_label
+    , aes(color = Source, label = pct)
+    , size = 3
+    , hjust = -0.5
+  ) +
+  geom_text(
+    data = df_left_label
+    , aes(color = Source, label = pct)
+    , size = 3
+    , hjust = +1.5
+  ) +
+  scale_x_continuous(
+    labels = scales::percent
+    , expand = expansion(mult = c(0.1, 0.1))
+    ) +
+  labs(
+    # title = "Proportion of respondents by Source and Demographics"
+    , y = "Demographics"
+  ) +
+  scale_colour_manual(values = c("Census" = "#ca0020", "Survey" = "#0571b0")) +
+  hrbrthemes::theme_ipsum(base_family = "roboto") +
+  theme(
+    panel.grid.major.y = element_blank()
+    , legend.position = "bottom"
+    , panel.background = element_rect(fill = "white", colour = "white"
+                                      , linetype = "solid", size = 0.5)
+    , plot.background = element_rect(fill = "white", colour = "white"
+                                      , linetype = "solid", size = 0.5)
+  )
+  
+```
+
 
 
 ## Spatial 
@@ -294,5 +397,115 @@ tm_shape(montreal_fsa) +
 
 
 
-# Table
+# Descriptive analysis
+
+Below, we get some basic information on who took the survey and what are some of the results related to their travel behavior.
+
+## Who took the survey?
+
+```{r, fig.align="center", fig.pos="H"}
+#| echo: false
+#| out-width: 100%
+#| fig-format: pdf
+#| fig-asp: 0.7
+#| fig-width: 7.5
+survey_filter_cd %>% select(
+  visible_minority
+  , gender
+  , age_groups_control_treat
+  , age_groups_5
+  , lone_household
+  , educ_has_postsec
+  , employed
+  , unemployed
+  , employment
+  , immigrant
+  , any_mobility_limitation
+  , any_functional_limitation
+  , in_lim
+  , has_vehicle_household
+) %>% 
+  rename(
+    "Visible minority" = visible_minority
+    , "Gender" = gender
+    , 'Control and treatment' = age_groups_control_treat
+    , "Age groups" = age_groups_5
+    , "Lone household" = lone_household
+    , "Has post-education" = educ_has_postsec
+    , "Employed" = employed
+    , "Unemployed" = unemployed
+    , "Employment" = employment
+    , "Immigrant" = immigrant
+    , "Any mobility limitation" = any_mobility_limitation
+    , "Any functional limitation" = any_functional_limitation
+    , "In LIM" = in_lim
+    , "Has Vehicle in Household" = has_vehicle_household
+  ) %>% 
+  mutate(
+    Gender = fct_recode(Gender, Female = "female", Male = "male", Other = "other")
+    , `Age groups` = fct_recode(`Age groups`, `Age 65 and over` = "age_65_over"
+                              , `Age 60-64` = "age_60_64"
+                              , `Age 55-59` = "age_55_59"
+                              , `Age 50-54` = "age_50_54")
+  ) %>% 
+DataExplorer::plot_bar(
+  data = .
+  , ggtheme = theme(
+    panel.background = element_rect(fill = "white", colour = "white"
+                                      , linetype = "solid", size = 0.5)
+    , plot.background = element_rect(fill = "white", colour = "white"
+                                      , linetype = "solid", size = 0.5)
+  )
+  , nrow = 2L
+  , ncol = 2L
+) 
+```
+
+
+```{r}
+#| tbl-cap: "Descriptive statistics of categorical variables"
+#| out-width: 100%
+survey_filter_cd %>% select(
+  visible_minority
+  , gender
+  , age_groups_control_treat
+  , age_groups_5
+  , lone_household
+  , educ_has_postsec
+  , employed
+  , unemployed
+  , employment
+  , immigrant
+  , any_mobility_limitation
+  , any_functional_limitation
+  , in_lim
+  , has_vehicle_household
+) %>% 
+  rename(
+    "Visible minority" = visible_minority
+    , "Gender" = gender
+    , 'Control and treatment' = age_groups_control_treat
+    , "Age groups" = age_groups_5
+    , "Lone household" = lone_household
+    , "Has post-education" = educ_has_postsec
+    , "Employed" = employed
+    , "Unemployed" = unemployed
+    , "Employment" = employment
+    , "Immigrant" = immigrant
+    , "Any mobility limitation" = any_mobility_limitation
+    , "Any functional limitation" = any_functional_limitation
+    , "In LIM" = in_lim
+    , "Has Vehicle in Household" = has_vehicle_household
+  ) %>% 
+  mutate(
+    Gender = fct_recode(Gender, Female = "female", Male = "male", Other = "other")
+    , `Age groups` = fct_recode(`Age groups`, `Age 65 and over` = "age_65_over"
+                              , `Age 60-64` = "age_60_64"
+                              , `Age 55-59` = "age_55_59"
+                              , `Age 50-54` = "age_50_54")
+  ) %>% modelsummary::datasummary_skim(type = "categorical")
+```
+
+
+## What is their travel behavior
 
