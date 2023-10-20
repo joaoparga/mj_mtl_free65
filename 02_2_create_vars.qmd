@@ -140,10 +140,10 @@ survey_filter_cd <- survey_filter_cd %>%
     ))
     # gender
     , gender = as_factor(case_when(
-      q41 == "Man" ~ "male"
-      , q41 == "Woman" ~ "female"
+      q41 == "Man" ~ "Male"
+      , q41 == "Woman" ~ "Female"
       , q41 %in% c("Non-binary", "Another gender identity, please specify:") ~ 
-        "other"
+        "Other"
       , .default = NA_character_
     ))
     # age raw
@@ -205,7 +205,20 @@ survey_filter_cd <- survey_filter_cd %>%
       , age_corrected >= 50L & age_corrected <= 54L ~ "age_50_54"
       , age_corrected >= 55L & age_corrected <= 59L ~ "age_55_59"
       , age_corrected >= 60L & age_corrected <= 64L ~ "age_60_64"
-      , age_corrected >= 65 ~ "age_65_over" 
+      , age_corrected >= 65L ~ "age_65_over" 
+      , .default = NA_character_
+    ))
+    , age_groups_5_all = as_factor(case_when(
+      age_corrected < 50L ~ "age_less_50"
+      , age_corrected >= 50L & age_corrected <= 54L ~ "age_50_54"
+      , age_corrected >= 55L & age_corrected <= 59L ~ "age_55_59"
+      , age_corrected >= 60L & age_corrected <= 64L ~ "age_60_64"
+      , age_corrected >= 65L & age_corrected <= 69L ~ "age_65_69"
+      , age_corrected >= 70L & age_corrected <= 74L ~ "age_70_74"
+      , age_corrected >= 75L & age_corrected <= 79L ~ "age_75_79"
+      , age_corrected >= 80L & age_corrected <= 84L ~ "age_80_84"
+      , age_corrected >= 85L & age_corrected <= 89L ~ "age_85_89"
+      , age_corrected >= 90L ~ "age_90_over"
       , .default = NA_character_
     ))
     , age_groups_control_treat = case_when(
@@ -341,7 +354,7 @@ survey_filter_cd <- survey_filter_cd %>%
       , q21 == "" ~ NA_character_
       , .default = "No"
     ))
-    , awereness_free_pas65 = as_factor(case_when(
+    , awereness_free_pass = as_factor(case_when(
       q23 == "No" ~ "No"
       , q23 == "Yes" ~ "Yes"
       , .default = NA_character_
@@ -351,7 +364,7 @@ survey_filter_cd <- survey_filter_cd %>%
       , q97 %in% c("No, but I’m not planning to get it", "No, but I’m planning to get it soon") ~ "No"
       , .default = NA_character_
     ))
-    , has_free_pas_categories = as_factor(case_when(
+    , has_free_pass_categories = as_factor(case_when(
       q97 %in% c("Prefer not to answer", "") ~ NA_character_ 
       , .default = q97
     ))
@@ -1042,6 +1055,18 @@ lvls_suppressed_alt <- c(
 )
 
 lvls_satisfied <- c("Satisfied", "Dissatisfied", "Neither")
+
+lvls_age_groups_all <- c(
+  "age_50_54"
+  , "age_55_59"
+  , "age_60_64"
+  , "age_65_69"
+  , "age_70_74"
+  , "age_75_79"  
+  , "age_80_84" 
+  , "age_85_89"
+  , "age_90_over" 
+)
 ```
 
 
@@ -1055,7 +1080,7 @@ survey_filter_cd <- survey_filter_cd %>%
         , firstnations_metis_inuit 
         , has_vehicle_household
         , transit_once_week_plus, last_7_mode_transit
-        , last_7_mode_car, last_7_mode_active, awereness_free_pas65
+        , last_7_mode_car, last_7_mode_active, awereness_free_pass
         , has_free_pass, rides_transit_as_would_like, has_cost_prevented_transit
         , confident_transit, satisfied_transit
         , difficulty_transport_expenses
@@ -1068,6 +1093,7 @@ survey_filter_cd <- survey_filter_cd %>%
     , employment = fct_relevel(employment, lvls_employment)
     , when_cost_transport_barrier = fct_relevel(when_cost_transport_barrier, lvls_when)
     , across(starts_with("^satisfaction"), ~fct_relevel(.x, lvls_satisfied))
+    , age_groups_5_all = fct_relevel(age_groups_5_all, lvls_age_groups_all)
     )
 
 
@@ -1119,10 +1145,19 @@ montreal_cd_ct <- montreal_cd_ct %>%
 
 # Save data
 
-```{r}
-sf::st_write(montreal_cd_ct, "data/report/montreal_cd_ct_count.gpkg", append = F)
-sf::st_write(montreal_fsa, "data/report/montreal_fsa_count.gpkg", append = F)
-sf::st_write(survey_filter_cd, "data/report/survey_filter_inside_cd.gpkg",
-             append = F)
+Save data as R.Data (for using factors columns)
+
+```{r saveasgpkg}
+# sf::st_write(montreal_cd_ct, "data/report/montreal_cd_ct_count.gpkg", append = F)
+# sf::st_write(montreal_fsa, "data/report/montreal_fsa_count.gpkg", append = F)
+# sf::st_write(survey_filter_cd, "data/report/survey_filter_inside_cd.gpkg",
+#              append = F)
+```
+
+
+```{r saverdata}
+save(montreal_cd_ct, file = "data/montreal_cd_ct.RData")
+save(montreal_fsa, file = "data/montreal_fsa.RData")
+save(survey_filter_cd, file = "data/survey_filter_cd.RData")
 save(l_trips, file = "data/list_count_trips.RData")
 ```
