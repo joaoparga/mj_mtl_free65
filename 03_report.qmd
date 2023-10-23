@@ -39,8 +39,7 @@ format:
          ]}
 date: "last-modified"
 date-format: '[This version:] MMMM D, YYYY'
-abstract: "This report overviews the first wave of the Montreal Fair Pass Survey's data. The survey's spatial representation generally coincides with areas that concentrate populations from low-income groups. Individuals from low-income households appear to be over-represented in the survey as a whole, whereas visible minorities appear to be under-represented. Other demographics (gender, control and treatment) showed no apparent significant difference in representation. Cost appear to be a transit barrier to relatively more people from the control than the treatment group. Moreover, satisfaction levels with transit use and activity participation are relatively higher for the latter than the former. The code used to produce this report is found on the project's [github repository](https://github.com/joaoparga/mj_fair_pass). "
-bibliography: bib/zoterolibrary_updated_10_05_23.bib
+abstract: "This report overviews the first wave of the Montreal Fair Pass Survey's data. The survey's spatial representation generally coincides with areas that concentrate populations from low-income groups. Individuals from low-income households appear to be over-represented in the survey as a whole, whereas visible minorities appear to be under-represented. Other demographics (gender, control and treatment) showed no apparent significant difference in representation. Cost appear to be a transit barrier to relatively more people from the control than the treatment group. Moreover, satisfaction levels with transit use and activity participation are relatively higher for the latter than the former. The code used to produce this report is found on the project's [github repository](https://github.com/joaoparga/mj_fair_pass)."
 csl: csl/american-sociological-association.csl
 tbl-cap-location: top
 number-sections: true
