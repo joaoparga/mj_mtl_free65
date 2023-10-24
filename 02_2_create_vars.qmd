@@ -93,8 +93,12 @@ pattern_vis_minority_q48_28_text <- "Arabe d’Egypte|Egyptian|Kabyle|Lebanese|L
 
 survey_filter_cd <- survey_filter_cd %>% 
   mutate(
+    income_groups = as_factor(case_when(
+      q31 == "I prefer not to answer" ~ NA_character_
+      , .default = str_trim(q31)
+    ))
     # income midpoint
-    income_midpoint = case_when(
+    ,income_midpoint = case_when(
       q31 == "Less than $15,000" ~ 15000/2
       , q31 == "$15,000 to $29,999 " ~ (15000 + 30000)/2
       , q31 == "$30,000 to $59,999" ~ (30000 + 60000)/2
@@ -243,7 +247,7 @@ survey_filter_cd <- survey_filter_cd %>%
       , stringr::str_detect(
         string = q48
         , pattern = "Native North American origins"
-      ) ~ "Native NA origins"
+      ) ~ "Indigenous"
       , stringr::str_detect(
         string = q48
         , pattern = "I prefer not to answer"
@@ -1067,6 +1071,18 @@ lvls_age_groups_all <- c(
   , "age_85_89"
   , "age_90_over" 
 )
+
+lvls_income <- c(
+  "Less than $15,000"
+  , "$15,000 to $29,999"
+  , "$30,000 to $59,999"
+  , "$60,000 to $89,999"
+  , "$90,000 to $119,999"
+  , "$120,000 to $149,999"
+  , "$150,000 to $179,999"
+  , "$180,000 to $209,999"
+  , "$210,000 or more"
+)
 ```
 
 
@@ -1094,8 +1110,8 @@ survey_filter_cd <- survey_filter_cd %>%
     , when_cost_transport_barrier = fct_relevel(when_cost_transport_barrier, lvls_when)
     , across(starts_with("^satisfaction"), ~fct_relevel(.x, lvls_satisfied))
     , age_groups_5_all = fct_relevel(age_groups_5_all, lvls_age_groups_all)
+    , income_groups = fct_relevel(income_groups, lvls_income)
     )
-
 
 ```
 

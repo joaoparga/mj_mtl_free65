@@ -39,7 +39,7 @@ format:
          ]}
 date: "last-modified"
 date-format: '[This version:] MMMM D, YYYY'
-abstract: "This report overviews the first wave of the Montreal Fair Pass Survey's data. The survey's spatial representation generally coincides with areas that concentrate populations from low-income groups. Individuals from low-income households appear to be over-represented in the survey as a whole, whereas visible minorities appear to be under-represented. Other demographics (gender, control and treatment) showed no apparent significant difference in representation. Cost appear to be a transit barrier to relatively more people from the control than the treatment group. Moreover, satisfaction levels with transit use and activity participation are relatively higher for the latter than the former. The code used to produce this report is found on the project's [github repository](https://github.com/joaoparga/mj_fair_pass)."
+abstract: "*Executive summary*: This report overviews the first wave of the Montreal Fair Pass Survey's data. The survey's spatial representation generally coincides with areas that concentrate populations from low-income groups. Individuals from low-income households appear to be over-represented in the survey as a whole, whereas visible minorities appear to be under-represented. Other demographics (gender, control and treatment) showed no apparent significant difference in representation. Cost appear to be a transit barrier to relatively more people from the control than the treatment group. Moreover, satisfaction levels with transit use and activity participation are relatively higher for the latter than the former. The code used to produce this report is found on the project's [github repository](https://github.com/joaoparga/mj_fair_pass)."
 csl: csl/american-sociological-association.csl
 tbl-cap-location: top
 number-sections: true
@@ -120,6 +120,7 @@ load(file = "data/montreal_fsa.RData")
 load(file = "data/survey_filter_cd.RData")
 load(file = "data/list_count_trips.RData")
 
+df_vis_min <- data.table::fread("data/df_prop_vis_minority_by_age_statscan.csv")
 # montreal fsa
 # montreal_fsa <- sf::st_read("data/report/montreal_fsa_count.gpkg")
 # montreal cd (ct)
@@ -192,14 +193,19 @@ census_age_sums <- montreal_cd_ct %>%
   summarise(across(everything(), ~ sum(., na.rm = T)))
   
 
+survey_filter_cd %>% filter(age_corrected>=55L) %>% 
+  nrow()
+
 df_representation <- tibble(
   prop_lim_census = sum(montreal_cd_ct$count_lim_tot_in_lim, na.rm = T) /
     sum(montreal_cd_ct$count_lim_tot_parent, na.rm = T)
   , prop_lim_survey = survey_filter_cd %>% filter(in_lim=="Yes") %>% nrow() /
     obssurvey
-  , prop_vis_minority_census = sum(montreal_cd_ct$tot_vis_minority_tot, na.rm = T) /
-    sum(montreal_cd_ct$tot_vis_minority_tot_parent, na.rm = T)
-  , prop_vis_minority_survey = survey_filter_cd %>% filter(visible_minority=="Visible minority") %>% nrow() /
+  
+  # , prop_vis_minority_45_over_census = df_vis_min$prop_vis_min_45_over
+  , prop_vis_minority_55_over_census = df_vis_min$prop_vis_min_55_over
+  # , prop_vis_minority_census = sum(montreal_cd_ct$tot_vis_minority_tot, na.rm = T) / sum(montreal_cd_ct$tot_vis_minority_tot_parent, na.rm = T)
+  , prop_vis_minority_55_over_survey = survey_filter_cd %>% filter(visible_minority=="Visible minority" & age_corrected>=55L) %>% nrow() /
     obssurvey
   , prop_male_census = sum(montreal_cd_ct$male_tot, na.rm = T) / sum(montreal_cd_ct$total_tot, na.rm = T)
   , prop_male_survey = survey_filter_cd %>% filter(gender=="Male") %>% nrow() / obssurvey
@@ -233,7 +239,7 @@ df_representation_t <- df_representation %>%
   mutate(
     Category = case_when(
       Category == "lim" ~ "In LIM"
-      , Category == "vis_minority" ~ "Visible Minority"
+      , Category == "vis_minority_55_over" ~ "Visible Minority (55 or more)"
       , Category == "male" ~ "Gender: Male"
       , Category == "female" ~ "Gender: Female"
       , Category == "age_50_64_tot" ~ "Age 50-64 (Total)"
@@ -324,12 +330,16 @@ The map on the right complements the former, showing the under and over-represen
 The survey's over-representation appears to be located on the regions that concentrate groups from low-income households, while under-representation occurs on less-populated and regions with low participation of the equity deserving groups from an income's perspective.
 
 
-```{r, fig.align="center", fig.pos="H", fig.cap=c("Population in LIM (Census)", "Under/over-representation ratio of survey respondents vs. population over 50")}
-#| label: map-1-under-over-fsa
+```{r, fig.align="center", fig.pos="H", fig.cap=c("On the left-hand side, population below the LIM according to the 2021 Canadian Census. On the right-hand side, under/over-representation ratio of survey respondents against the population over 50 years old in the Census.")}
+#| label: fig-2-under-over-fsa
 #| out-width: 100%
 #| fig-format: pdf
-#| fig-asp: 1
-#| layout-ncol: 2
+#| fig-asp: 0.67
+#| fig-width: 8
+
+# layout-ncol: 2
+
+# "Population in LIM (Census)", "Under/over-representation ratio of survey respondents vs. population over 50"
 
 # quarto figures
 # https://r4ds.hadley.nz/quarto.html
@@ -340,7 +350,7 @@ The survey's over-representation appears to be located on the regions that conce
 
 # fig-cap: "Under/over-representation: Ratio of the proportions of survey respondents vs. the population over 50 in each FSA (left)"
 
-tm_shape(fsa_ct_grouped) +
+tm_pop <- tm_shape(fsa_ct_grouped) +
   tm_polygons(
     col = "prop_tot_in_lim"
     , style = "jenks"
@@ -366,14 +376,14 @@ tm_shape(fsa_ct_grouped) +
     , position = "left"
     )
 
-tm_shape(montreal_fsa) + 
+tm_under_over <- tm_shape(montreal_fsa) + 
   tm_polygons(
     col = "under_over"
     , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
     , palette = "RdBu"
     , border.alpha = 0.5
     , alpha = 0.95
-    , labels = c("0.00-0.50: Survey underrepresents","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Survey overrepresents')
+    , labels = c("0.00-0.50: Survey under-representation","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Over-representation')
     , title = "Ratio: Survey/(Census)"
     ) + 
   # tm_text(
@@ -404,7 +414,7 @@ tm_shape(montreal_fsa) +
   tm_scale_bar(breaks = c(0,2), color.dark = "grey30", text.color = "grey30"
                , position = "left")
 
-# tmap_arrange(tm_under_over_fsa, tm_under_over_ct)
+tmap_arrange(tm_pop, tm_under_over)
 ```
 
 
@@ -414,70 +424,28 @@ tm_shape(montreal_fsa) +
 
 ## Who took the survey?
 
-This subsection contains a general description of who took the first wave of the survey, according the descriptive statistics of some selected socio-demographics presented in the table below.
+This subsection contains a general description of who took the first wave of the survey, according the descriptive statistics of some selected socio-demographics presented in the tables below.
+The first compares the relative proportion of control and treatment groups, and the proportion of the respondents in 5 year increments.
+The second compares control and treatment according to selected demographics.
 
-Non-visible minority correspond the majority (90%) of the survey's respondents, and immigrants represented less than 20% of the total respondents. 
-These relative proportions might hinder the Pilot's capacity to evaluate the policy's impacts on these marginalized communities.
-Representation of women and men appeared to be fairly equal, but non-binary or other gender identities are severely under-represented.
-Control (50 to 64 years old) and treatment (65 years and over) are also similarly represented. 
-Additionally, almost 90% of the respondents were between the ages of 50 and 74 years old, which means that investigations on the policy's effects on older stratifications of the population might be challenging as well.
-364 (22%) of the individuals declared having at least a permanent functional limitation (which includes hearing or visual impairments, language or speech disorder, mobility limitations that requires the use of wheelchairs, to name a few).
-Moreover, almost 8% (126) of the respondents declared having a mobility limitation, which are most commonly associated with transportation barriers and challenges regarding accessibility.
-
-The majority of them had at least one level of post-secondary education (College or trade, school, CEGEP, Bachelor, Master or Doctorate degrees).
-More than half of the survey's respondents declared being retired, and 40% of them declared being employed (either part or full-time).
-Regarding income and the income distribution, one third of the respondents could be classified within the Low Income measure (LIM).
-These populations are theoretical targets of the policy, which works in favor of the survey's representation.
-Almost half of the individuals lived in a single-person household.
-Finally, almost 60% of the respondents declared having a vehicle in their households, while 40% of them did not have access to cars.
+Control (50 to 64 years old) and treatment (65 years and over) are similarly represented. 
+Additionally, almost 90% of the respondents were between the ages of 50 and 74 years old, which means that investigations on the policy's effects on older stratifications of the population might be challenging.
 
 
-
-
-
-```{r tbldescriptive, tab.id="descriptive", tab.cap="Descriptive statistics for categorical variables"}
+```{r tbldescriptiveage, tab.id="descriptive", tab.cap="Descriptive statistics for categorical age groups"}
 #| echo: false
 #| tbl-cap: Descriptive statistics for categorical variables
 
 survey_filter_cd %>% select(
-  visible_minority
-  , immigrant
-  , gender
-  , age_groups_control_treat
-  # , age_groups_5
-  , age_groups_5_all
-  , any_mobility_limitation
-  , any_functional_limitation
-  
-  
-  # , employed
-  # , unemployed
-  , educ_has_postsec
-  , employment
-  , in_lim
-  , lone_household
-  , has_vehicle_household
+ age_groups_control_treat, age_groups_5_all
 ) %>% 
   rename(
-    "Visible minority" = visible_minority
-    , "Immigrant" = immigrant
-    , "Gender" = gender
-    , 'Control and treatment' = age_groups_control_treat
-    , "Age groups" = age_groups_5_all
-    , "Any mobility limitation" = any_mobility_limitation
-    , "Any functional limitation" = any_functional_limitation
-    
-    # , "Employed" = employed
-    # , "Unemployed" = unemployed
-    , "Has post-education" = educ_has_postsec
-    , "Employment" = employment
-    , "In LIM" = in_lim
-    , "Lone household" = lone_household
-    , "Has Vehicle in Household" = has_vehicle_household
+    'Age groups (Control and Treatment)' = age_groups_control_treat
+    , "Age groups (5 years intervals)" = age_groups_5_all
   ) %>% 
   mutate(
-    `Age groups` = fct_recode(
-      `Age groups`
+    `Age groups (5 years intervals)` = fct_recode(
+      `Age groups (5 years intervals)`
       , `Age 50-54` = "age_50_54"
       , `Age 55-59` = "age_55_59"
       , `Age 60-64` = "age_60_64"
@@ -492,9 +460,127 @@ survey_filter_cd %>% select(
   st_drop_geometry() %>% 
   gtsummary::tbl_summary(
     type = gtsummary::all_dichotomous() ~ "categorical"
-    , sort = all_categorical() ~ "frequency"
+    , sort = list(
+      `Age groups (5 years intervals)` ~ "alphanumeric"
+      , `Age groups (Control and Treatment)` ~ "frequency"
+    ) 
+    # all_categorical() ~ "alphanumeric"
     , missing_text = "Missing"
   ) %>% 
+  gtsummary::modify_caption(caption = "Age groups of the respondents") %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+  # gtsummary::as_gt() %>% 
+  # gt::tab_options(table.font.names = "Arial")
+#%>% 
+  # as_flex_table() 
+#%>% 
+  # gtsummary::modify_header(label = "Demographics") %>% 
+  # gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+
+Non-visible minority correspond the majority (90%) of the survey's respondents, and immigrants represented less than 20% of the total respondents. 
+These relative proportions might hinder the Pilot's capacity to evaluate the policy's impacts on these marginalized communities.
+Representation of women and men appeared to be fairly equal, but non-binary or other gender identities are severely under-represented.
+364 (22%) of the individuals declared having at least a permanent functional limitation (which includes hearing or visual impairments, language or speech disorder, mobility limitations that requires the use of wheelchairs, to name a few).
+Moreover, almost 8% (126) of the respondents declared having a mobility limitation, which are most commonly associated with transportation barriers and challenges regarding accessibility.
+
+The majority of them had at least one level of post-secondary education (College or trade, school, CEGEP, Bachelor, Master or Doctorate degrees).
+Employment characteristics showed stark differences between control and treatment, which was not surprising.
+While 86% (668) of the respondents in the treatment group are retired, only a quarter (225) of the control group have done so.
+In contrast, more than half of the individuals from the control group have a full-time job, and 12% (105) of them have a part time job, while the proportions of those employed in part- or full-time jobs in the treatment group amount to 13% all together.
+Unemployment is significantly higher (4.4%) in the control group than in the treatment, since the proportion of people above 65 years old who declared being unemployed did not amount to 1% of them.
+
+The income distribution of control and treatment groups are similar, with some notable exceptions in the lowest income groups. 
+The proportion of people within the lowest income stratification (i.e., those earning less than \$15,000 annually) is higher for control (8.3%) than treatment.
+In contrast, the second lowest stratification (\$15,000-\$29,999) has a higher proportion from treatment (31%) than in the control (18%).
+One third of the respondents could be classified as having an income below the Low Income measure (LIM). 
+This population is most likely to benefit from the policy, which works in favor of the survey’s representation. 
+Almost half of the individuals lived in a single-person household. 
+
+Finally, almost 60% of the respondents declared having a vehicle in their households, while 40% of them did not have access to cars.
+This study will be particularly interested in examining the impacts of the pass on the 487 respondents (33% of sample) who indicate living below the poverty line without access to a personal vehicle in the household, as these are the respondents most likely to be suffering from transport poverty and at risk of transport-related social exclusion.
+
+
+```{r tbldescriptive, tab.id="descriptive", tab.cap="Descriptive statistics for categorical variables"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for categorical variables
+
+survey_filter_cd %>% select(
+  visible_minority
+  , immigrant
+  , gender
+  , age_groups_control_treat
+  # , age_groups_5
+  # , age_groups_5_all
+  , any_mobility_limitation
+  , any_functional_limitation
+  
+  
+  # , employed
+  # , unemployed
+  , educ_has_postsec
+  , employment
+  , income_groups
+  , in_lim
+  , lone_household
+  , has_vehicle_household
+) %>% 
+  rename(
+    "Visible minority" = visible_minority
+    , "Is Immigrant" = immigrant
+    , "Gender" = gender
+    , 'Age Groups Control Treat' = age_groups_control_treat
+    # , "Age groups" = age_groups_5_all
+    , "Any mobility limitation" = any_mobility_limitation
+    , "Any functional limitation" = any_functional_limitation
+    
+    # , "Employed" = employed
+    # , "Unemployed" = unemployed
+    , "Has post-secondary education" = educ_has_postsec
+    , "Employment" = employment
+    , "Annual income groups" = income_groups
+    , "Household below LIM" = in_lim
+    , "Single-person household" = lone_household
+    , "Has Vehicle in Household" = has_vehicle_household
+  ) %>% 
+  # mutate(
+  #   `Annual income groups` = fct_recode(
+  #     `Annual income groups`
+  #     , `Age 50-54` = "age_50_54"
+  #     , `Age 55-59` = "age_55_59"
+  #     , `Age 60-64` = "age_60_64"
+  #     , `Age 65-69` = "age_65_69"
+  #     , `Age 70-74` = "age_70_74"
+  #     , `Age 75-79` = "age_75_79"
+  #     , `Age 80-84` = "age_80_84"
+  #     , `Age 85-89` = "age_85_89"
+  #     , `Age 90 and over` = "age_90_over"
+  #     )
+  # ) %>%
+  st_drop_geometry() %>% 
+  gtsummary::tbl_summary(
+    type = gtsummary::all_dichotomous() ~ "categorical"
+    , sort = list(
+      `Visible minority` ~ "frequency"
+      , `Is Immigrant` ~ "frequency"
+      , `Gender` ~ "frequency"
+      , `Any mobility limitation` ~ "frequency"
+      , `Any functional limitation` ~ "frequency"
+      , `Has post-secondary education` ~ "frequency"
+      , `Employment` ~ "frequency"
+      , `Annual income groups` ~ "alphanumeric"
+      , `Household below LIM` ~ "frequency"
+      , `Single-person household` ~ "frequency"
+      , `Has Vehicle in Household` ~ "frequency"
+    )
+      # all_categorical() ~ "frequency"
+    , missing_text = "Missing"
+    , by = `Age Groups Control Treat`
+  ) %>% 
+  gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
   gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>% 
   as_flex_table() %>% 
   flextable::font(fontname = "Arial")
@@ -556,6 +642,10 @@ df_rename %>%
          , `Suppressed Trip Alterantive Mode`
          # , `Transit Barrier Cost Related`
         ) %>% 
+  rename(
+    `Has Cost Prevented Transit?` = `Has Cost Prevented Transit`
+    , `Difficulty Paying Transport Expenses` = `Difficulty Transport Expenses`
+    ) %>% 
   gtsummary::tbl_summary(
     type = gtsummary::all_dichotomous() ~ "categorical"
     , sort = all_categorical() ~ "frequency"
