@@ -206,7 +206,7 @@ df_representation <- tibble(
   , prop_vis_minority_55_over_census = df_vis_min$prop_vis_min_55_over
   # , prop_vis_minority_census = sum(montreal_cd_ct$tot_vis_minority_tot, na.rm = T) / sum(montreal_cd_ct$tot_vis_minority_tot_parent, na.rm = T)
   , prop_vis_minority_55_over_survey = survey_filter_cd %>% filter(visible_minority=="Visible minority" & age_corrected>=55L) %>% nrow() /
-    obssurvey
+    survey_filter_cd %>% filter(age_corrected>=55L) %>% nrow()
   , prop_male_census = sum(montreal_cd_ct$male_tot, na.rm = T) / sum(montreal_cd_ct$total_tot, na.rm = T)
   , prop_male_survey = survey_filter_cd %>% filter(gender=="Male") %>% nrow() / obssurvey
   , prop_female_census = sum(montreal_cd_ct$female_tot, na.rm = T) / sum(montreal_cd_ct$total_tot, na.rm = T)
