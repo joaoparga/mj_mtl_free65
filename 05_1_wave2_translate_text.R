@@ -62,7 +62,7 @@ deeplr::usage2(key)
 # 
 # dt_v2_q21_14_text[
 #   !is.na(v2_q21_14_text) & v2_q21_14_text != "-99"
-#   , v2_q21_14_text_trans := deeplr::translate2(
+#   , v2_q21_14_trans := deeplr::translate2(
 #     text = v2_q21_14_text, target_lang = "EN", source_lang = "FR", auth_key = key
 #   )
 #   ]
@@ -74,7 +74,7 @@ deeplr::usage2(key)
 # ** save data ------------------------------------------------------------
 
 # dt_v2_q21_14_text <- dt_v2_q21_14_text %>% 
-#   select(v1, v2_q21_14_text, v2_q21_14_text_trans)
+#   select(v1, v2_q21_14_text, v2_q21_14_trans)
 # data.table::fwrite(dt_v2_q21_14_text, "data/translated_v2_q21_14_text.csv")
 
 # * q25_29_text -----------------------------------------------------------
