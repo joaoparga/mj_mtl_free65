@@ -540,17 +540,17 @@ df_both <- df_both %>%
       , q23 == "Yes" ~ "Yes"
       , .default = NA_character_
     ))
-    , has_free_pass = as_factor(case_when(
+    , has_free_pass_wave1 = as_factor(case_when(
       q97 == "Yes" ~ "Yes"
       , q97 %in% c("No, but I’m not planning to get it", "No, but I’m planning to get it soon") ~ "No"
       , .default = NA_character_
     ))
-    , has_free_pass_categories = as_factor(case_when(
+    , has_free_pass_wave1_categories = as_factor(case_when(
       q97 %in% c("Prefer not to answer", "") ~ NA_character_ 
       , .default = q97
     ))
     # fare types (figure out how to code)
-    , main_fare = as_factor(case_when(
+    , fare_type_before_pass_q98 = as_factor(case_when(
       str_detect(q98, "(1|2|10)-trip") ~ "Limited daily"
       , str_detect(q98, "Unlimited|24-hr") ~ "Unlimited daily"
       , str_detect(q98, "3-day|Weekly") ~ "3-day or weekly"
@@ -558,6 +558,14 @@ df_both <- df_both %>%
       , str_detect(q98, "Other") ~ "Other"
       , .default = NA_character_
     ))
+    , fare_type_before_pass_q99 = as_factor(case_when(
+      str_detect(q99, "(1|2|10)-trip") ~ "Limited daily"
+      , str_detect(q99, "Unlimited|24-hr") ~ "Unlimited daily"
+      , str_detect(q99, "3-day|Weekly") ~ "3-day or weekly"
+      , str_detect(q99, regex("month", ignore_case = T)) ~ "Monthly or more"
+      , str_detect(q99, "Other") ~ "Other"
+      , .default = NA_character_
+    ))    
     , rides_transit_as_would_like = as_factor(case_when(
       # q100 %in% c("", "Prefer not to answer") ~ NA_character_
       q100 == "Yes" ~ "Yes"
@@ -777,26 +785,43 @@ df_both <- df_both %>%
   )
 ```
 
-66666666
-!!!!! CONTINUAR AQUI
-66666666
 
 ### Cols from wave 2 only
+
+Obs.: q112 and q114 are text. They need to be scrutinized qualitatively or with a methodology for this long answers in quantative studies purpose.
+
+Obs.2: per q116, 27 people have moved since the first survey. The update of their spatial location need to be made in the future
+
+Obs.: q104 is another qualitative question
 
 ```{r}
 # col types from wave2
 # df_both %>% select(cols_wave2only) %>% glimpse()
-```
+df_both <- df_both %>% 
+  mutate(
+    has_free_pass_wave2 = as.factor(case_when(
+      q111 == "No" ~ "No"
+      , q111 == "Yes" ~ "Yes"
+      , .default = NA_character_
+    ))
+    , has_free_pass_improved_wave2 = as.factor(case_when(
+      q115 == "No" ~ "No"
+      , q115 == "Yes" ~ "Yes"
+      , .default = NA_character_
+    ))
+  )
 
+```
 
 
 
 ### Vars by mode_destination
 
 ```{r varsq22q96}
-df_count <- survey_filter_cd
+df_count <- df_both
 df_count <- df_count %>% 
-  select(v1, q21, q22_1:q94_10)
+  select(c(v1, wave, q21, q22_1:q94_10,q117_1:q117_10)) %>% 
+  mutate(across(!c(v1:q21), ~na_if(., -99L)))
 
 df_count <- df_count %>% 
   rename_with(.fn = ~str_replace(., "^q22", "mode_stm_bus")) %>% 
@@ -816,7 +841,6 @@ df_count <- df_count %>%
   rename_with(.fn = ~str_replace(., "^q94", "mode_motorcycle")) %>% 
   rename_with(.fn = ~str_replace(., "^q117", "mode_rem"))
 
-!!!!!! CONTINUAR AQUI
 
 df_count <- df_count %>% 
   rename_with(.fn = ~str_replace(., "_1$", "_dest_work")) %>% 
@@ -835,77 +859,82 @@ df_count <- df_count %>%
   mutate(
     last_7_stm_bus = as_factor(case_when(
       str_detect(string = q21, pattern = "STM bus") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_metro = as_factor(case_when(
       str_detect(string = q21, pattern = "Metro") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_paratransit = as_factor(case_when(
       str_detect(string = q21, pattern = "STM Paratransit") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_other_bus = as_factor(case_when(
       str_detect(string = q21, pattern = "Bus (not with the STM)") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_rail = as_factor(case_when(
       str_detect(string = q21, pattern = "Commuter rail") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_walk = as_factor(case_when(
       str_detect(string = q21, pattern = "Walking") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_own_bike = as_factor(case_when(
       str_detect(string = q21, pattern = "Own bike") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_own_scooter = as_factor(case_when(
       str_detect(string = q21, pattern = "Own scooter") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_service_bike = as_factor(case_when(
       str_detect(string = q21, pattern = "Self-service bike") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_service_scooter = as_factor(case_when(
       str_detect(string = q21, pattern = "Self-service scooter") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_own_car = as_factor(case_when(
       str_detect(string = q21, pattern = "Own car") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_carpooling = as_factor(case_when(
       str_detect(string = q21, pattern = "Carpooling") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_carsharing = as_factor(case_when(
       str_detect(string = q21, pattern = "Carsharing") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_taxi = as_factor(case_when(
       str_detect(string = q21, pattern = "Taxi") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
     , last_7_motorcycle = as_factor(case_when(
       str_detect(string = q21, pattern = "Motorcycle") ~ "Yes"
-      , q21 == "" ~ NA_character_
+      , is.na(q21) ~ NA_character_
+      , .default = "No"
+    ))
+    , last_7_rem = as_factor(case_when(
+      str_detect(string = q21, pattern = "The REM") ~ "Yes"
+      , is.na(q21) ~ NA_character_
       , .default = "No"
     ))
   )
@@ -1042,20 +1071,22 @@ df_count <- df_count %>%
 
 ### Correct missing code
 
-```{r correctmissingcoding}
-data.table::setDT(df_count)
-# OBS CHECK mode_ columns position before running code below
-colunas <- colnames(df_count[,3:152])
-df_count[
-  , (colunas) := replace(.SD, .SD == -99L, 0L)
-  , .SDcols = colunas
-  ]
+<!-- ```{r correctmissingcoding} -->
+<!-- data.table::setDT(df_count) -->
+<!-- # OBS CHECK mode_ columns position before running code below -->
+<!-- colunas <- colnames(df_count[,3:152]) -->
+<!-- df_count[ -->
+<!--   , (colunas) := replace(.SD, .SD == -99L, 0L) -->
+<!--   , .SDcols = colunas -->
+<!--   ] -->
 
-# df_count <- df_count %>% 
-#   mutate(
-#     across(mode_stm_bus_dest_work:mode_motorcycle_dest_volunteer, ~dplyr::na_if(., -99L))
-#   )
-```
+<!-- # df_count <- df_count %>%  -->
+<!-- #   mutate( -->
+<!-- #     across(mode_stm_bus_dest_work:mode_motorcycle_dest_volunteer, ~dplyr::na_if(., -99L)) -->
+<!-- #   ) -->
+<!-- ``` -->
+
+
 
 
 ```{r counttrips}
@@ -1063,9 +1094,8 @@ f_count_trips <- function(){
   
   # count trips by mode and destination
 df_trips <- df_count %>% 
-  select(v1,mode_stm_bus_dest_work:mode_motorcycle_dest_volunteer) %>% 
-  st_drop_geometry() %>% 
-  pivot_longer(cols = mode_stm_bus_dest_work:mode_motorcycle_dest_volunteer
+  select(v1,wave,mode_stm_bus_dest_work:mode_rem_dest_volunteer) %>% 
+  pivot_longer(cols = mode_stm_bus_dest_work:mode_rem_dest_volunteer
                ,names_to = "type", values_to = "count") %>% 
   separate_wider_regex(
   type
@@ -1076,7 +1106,7 @@ df_trips <- df_count %>%
     count = tidyr::replace_na(count, 0L)
     # identify transit trips
     , type = case_when(
-      mode %in% c("metro", "other_bus", "paratransit", "rail", "stm_bus") ~ "transit"
+      mode %in% c("metro", "other_bus", "paratransit", "rail", "stm_bus", "rem") ~ "transit"
       , mode %in% c("walk", "own_bike", "service_bike") ~ "active"
       , mode %in% c("own_car", "carsharing") ~ "car"
       , .default = "other"
@@ -1085,22 +1115,30 @@ df_trips <- df_count %>%
 
 data.table::setDT(df_trips)
 
+
 # count total trips
 df_trips_total <- df_trips %>% 
   group_by(v1) %>% 
   summarise(count_trips_total = sum(count, na.rm = T)) %>% 
-  mutate(avg_trips_total = count_trips_total / 7)
+  mutate(avg_trips_weekly_total = count_trips_total / 7)
+
+# count total trips wave
+df_trips_wave <- df_trips %>% 
+  group_by(v1, wave) %>% 
+  summarise(count_trips_wave = sum(count, na.rm = T)) %>% 
+  mutate(avg_trips_weekly_wave = count_trips_wave / 7)
 
 
 # count modes used
 df_modes <- df_trips[
   !is.na(count) & count != 0L
   , .(count_modes = data.table::uniqueN(c(mode)))
-  , by = .(v1)
+  , by = .(v1, wave)
 ]
-
-df_count_modes <- df_count %>% select(v1) %>% 
-  dplyr::left_join(df_modes, by = "v1")
+# the code below does not include lines for observations with NA
+# the code below left joins the data so that all the observations have info on number modes
+df_count_modes <- df_count %>% select(v1, wave) %>% 
+  dplyr::left_join(df_modes, by = c("v1", "wave"))
 rm(df_modes)
 
 df_count_modes <- df_count_modes %>% 
@@ -1110,11 +1148,11 @@ df_count_modes <- df_count_modes %>%
 df_dest <- df_trips[
   !is.na(count) & count != 0L
   , .(count_dest = data.table::uniqueN(c(dest)))
-  , by = .(v1)
+  , by = .(v1, wave)
 ]
 
-df_count_dest <- df_count %>% select(v1) %>% 
-  dplyr::left_join(df_dest, by = "v1")
+df_count_dest <- df_count %>% select(v1, wave) %>% 
+  dplyr::left_join(df_dest, by = c("v1", "wave"))
 rm(df_dest)
 
 df_count_dest <- df_count_dest %>% 
@@ -1122,12 +1160,12 @@ df_count_dest <- df_count_dest %>%
 
 # count trips by mode
 df_trips_mode <- df_trips %>% 
-  group_by(v1, mode) %>% 
+  group_by(v1, wave, mode) %>% 
   summarise(count_trips_mode = sum(count, na.rm = T)) 
 
 df_trips_mode_wide <- df_trips_mode %>% 
   pivot_wider(
-    id_cols = v1
+    id_cols = c(v1,wave)
     , names_from = mode
     , values_from = count_trips_mode
     , names_prefix = "count_trips_"
@@ -1135,36 +1173,37 @@ df_trips_mode_wide <- df_trips_mode %>%
 
 # count trips by type
 df_trips_type <- df_trips %>% 
-  group_by(v1, type) %>% 
+  group_by(v1, wave, type) %>% 
   summarise(count_trips_type = sum(count, na.rm = T))
 
 df_trips_type_wide <- df_trips_type %>% 
   pivot_wider(
-    id_cols = v1
+    id_cols = c(v1, wave)
     , names_from = type
     , values_from = count_trips_type
-    , names_prefix = "count_trips_"
+    , names_prefix = "count_trips_type_"
   )
 
 # count trips by dest
 df_trips_dest <- df_trips %>% 
-  group_by(v1, dest) %>% 
+  group_by(v1, wave, dest) %>% 
   summarise(count_trips_dest = sum(count, na.rm = T))
 
 df_trips_dest_wide <- df_trips_dest %>% 
   pivot_wider(
-    id_cols = v1
+    id_cols = c(v1, wave)
     , names_from = dest
     , values_from = count_trips_dest
     , names_prefix = "count_trips_"
     )
   
+
 # main dest, mode, type
    # LATER: HOW TO DEALT WITH TIES?
-df_main_ind_trip <- df_trips[, .SD[which.max(count)], by = .(v1)]
+df_main_ind_trip <- df_trips[, .SD[which.max(count)], by = .(v1,wave)]
 
 data.table::setDT(df_trips_dest)
-df_main_trip_dest <- df_trips_dest[, .SD[which.max(count_trips_dest)], by = .(v1)] %>% 
+df_main_trip_dest <- df_trips_dest[, .SD[which.max(count_trips_dest)], by = .(v1, wave)] %>% 
   mutate(
     main_dest = case_when(
       count_trips_dest == 0L ~ NA_character_
@@ -1173,7 +1212,7 @@ df_main_trip_dest <- df_trips_dest[, .SD[which.max(count_trips_dest)], by = .(v1
       )
 
 data.table::setDT(df_trips_mode)
-df_main_trip_mode <- df_trips_mode[, .SD[which.max(count_trips_mode)], by = .(v1)] %>% 
+df_main_trip_mode <- df_trips_mode[, .SD[which.max(count_trips_mode)], by = .(v1,wave)] %>% 
   mutate(
     main_mode = case_when(
       count_trips_mode == 0L ~ NA_character_
@@ -1182,7 +1221,7 @@ df_main_trip_mode <- df_trips_mode[, .SD[which.max(count_trips_mode)], by = .(v1
   )
 
 data.table::setDT(df_trips_type)
-df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(v1)] %>% 
+df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(v1,wave)] %>% 
   mutate(
     main_type = case_when(
       count_trips_type == 0L ~ NA_character_
@@ -1216,10 +1255,13 @@ df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(v1
   lista <- list(
     "df_trips" = df_trips
     , 'df_trips_total' = df_trips_total
+    , 'df_trips_wave' = df_trips_wave
     , 'df_count_modes' = df_count_modes
     , 'df_count_dest' = df_count_dest
     , 'df_trips_mode' = df_trips_mode
     , 'df_trips_mode_wide' = df_trips_mode_wide
+    , "df_trips_type" = df_trips_type
+    , "df_trips_type_wide" = df_trips_type_wide
     , 'df_trips_dest' = df_trips_dest
     , 'df_trips_dest_wide' = df_trips_dest_wide
     , "df_main_ind_trip" = df_main_ind_trip
@@ -1231,22 +1273,30 @@ df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(v1
   return(lista)
 }
 
-l_trips <- f_count_trips()
+l_trips_wave <- f_count_trips()
 # str_extract("(?<=mode_)(.*)(?=_dest_)")
 # str_extract("(?<=dest_)(.*)")
 ```
 
 ```{r joincounttrips}
-survey_filter_cd <- survey_filter_cd %>% 
-  dplyr::left_join(l_trips$df_trips_total) %>% 
-  dplyr::left_join(l_trips$df_count_modes) %>% 
-  dplyr::left_join(l_trips$df_count_dest) %>% 
-  dplyr::left_join(l_trips$df_main_trip_dest %>% select(v1,main_dest)) %>% 
-  dplyr::left_join(l_trips$df_main_trip_mode %>% select(v1,main_mode)) %>% 
-  dplyr::left_join(l_trips$df_main_trip_type %>% select(v1,main_type))
+df_both <- df_both %>% 
+  dplyr::left_join(l_trips_wave$df_trips_total, by = c("v1")) %>% 
+  dplyr::left_join(l_trips_wave$df_trips_wave, by = c("v1","wave")) %>% 
+  dplyr::left_join(l_trips_wave$df_count_modes, by = c("v1","wave")) %>% 
+  dplyr::left_join(l_trips_wave$df_count_dest, by = c("v1","wave")) %>%
+  dplyr::left_join(l_trips_wave$df_trips_dest_wide, by = c("v1","wave")) %>%
+  dplyr::left_join(l_trips_wave$df_trips_type_wide, by = c("v1","wave")) %>%  
+  dplyr::left_join(l_trips_wave$df_main_trip_dest %>% select(v1,wave,main_dest)
+                   , by = c("v1","wave")) %>% 
+  dplyr::left_join(l_trips_wave$df_main_trip_mode %>% select(v1,wave,main_mode)
+                   , by = c("v1","wave")) %>% 
+  dplyr::left_join(l_trips_wave$df_main_trip_type %>% select(v1,wave,main_type)
+                   , by = c("v1","wave"))
 ```
 
 ### Recode factor levels
+
+THIS HAS NOT BEEN UPDATED. UPDATE ACCORDING TO THE NEEDS OF NEW VARIABLES
 
 ```{r factorlevels}
 lvls_yes_no <- c("No", "Yes")
@@ -1381,8 +1431,11 @@ Save data as R.Data (for using factors columns)
 
 
 ```{r saverdata}
+save(l_trips_wave, file = "data/list_count_trips_wave.RData")
+save(df_both, file = "data/df_both_waves.RData")
+
 save(montreal_cd_ct, file = "data/montreal_cd_ct.RData")
 save(montreal_fsa, file = "data/montreal_fsa.RData")
 save(survey_filter_cd, file = "data/survey_filter_cd.RData")
-save(l_trips, file = "data/list_count_trips.RData")
+save(l_trips_wave, file = "data/list_count_trips.RData")
 ```

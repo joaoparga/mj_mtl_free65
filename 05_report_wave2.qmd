@@ -780,3 +780,39 @@ Finally, it is important to note two things. First, these types of cross-tabulat
 #     , ncol = 2L
 #   ) 
 ```
+
+
+
+# Update
+
+## Old analysis (1st wave only (demographics?))
+
+```{r}
+# loaded free pass on card (treat and control)
+df_both %>% filter(wave=="Second") %>%  count(q111, age_groups_control_treat)
+```
+
+df_both %>% filter(wave=="Second") %>%  count(q111, age_groups_control_treat)
+
+
+## Update old (1st and 2nd wave combined)
+
+Awareness of free pass and how did that translate to its use
+```{r}
+# 1st wave
+df_both %>% filter(wave=="Second") %>%  count(awereness_free_pass, age_groups_control_treat)
+df_both %>% filter(wave=="Second") %>%  count(has_free_pass_wave1, age_groups_control_treat)
+df_both %>% filter(wave=="Second") %>%  count(has_free_pass_wave1_categories, age_groups_control_treat)
+
+# type of fare (available for 1st wave only)
+df_both %>% filter(wave=="Second" & has_free_pass_wave1 == "Yes") %>%  count(fare_type_before_pass_q98, age_groups_control_treat)
+df_both %>% filter(wave=="Second" & has_free_pass_wave1 == "Yes") %>%  count(fare_type_before_pass_q99, age_groups_control_treat)
+
+# 2nd wave
+# has free pass loaded
+df_both %>% filter(wave=="Second") %>%  count(q111, age_groups_control_treat)
+
+```
+
+
+## New analysis only (2nd wave only)
