@@ -46,7 +46,8 @@ load(file = "data/survey_filter_cd.RData")
 wave1_filtered <- survey_filter_cd
 rm(survey_filter_cd)
 
-wave1_original <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
+# wave 1 data raw (to check number of observations)
+df_montreal <- data.table::fread("data/MontrealRawData_2023_08_24.csv")
 ```
 
 ## Montreal shapes
@@ -61,6 +62,15 @@ wave1_original <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
 <!-- montreal_split <- sf::st_read("data/montreal_split/RA_CBC_EOD18.shp") %>%  -->
 <!--   janitor::clean_names() -->
 <!-- ``` -->
+
+## Filter data
+
+Filter by the individuals that we were able to geocode in the first wave of analysis
+```{r}
+df_full <- df_full %>% 
+  filter(v1 %in% wave1_filtered$v1)
+```
+
 
 
 ## Translated data
@@ -1346,7 +1356,7 @@ lvls_income <- c(
 
 
 ```{r recodefactorrelevel}
-survey_filter_cd <- survey_filter_cd %>% 
+df_both <- df_both %>% 
   mutate(
     across(
       c(in_lim, educ_has_postsec, lone_household, employed, unemployed
@@ -1356,7 +1366,8 @@ survey_filter_cd <- survey_filter_cd %>%
         , has_vehicle_household
         , transit_once_week_plus, last_7_mode_transit
         , last_7_mode_car, last_7_mode_active, awereness_free_pass
-        , has_free_pass, rides_transit_as_would_like, has_cost_prevented_transit
+        , has_free_pass_wave1, 
+        , rides_transit_as_would_like, has_cost_prevented_transit
         , confident_transit, satisfied_transit
         , difficulty_transport_expenses
         )
@@ -1434,8 +1445,4 @@ Save data as R.Data (for using factors columns)
 save(l_trips_wave, file = "data/list_count_trips_wave.RData")
 save(df_both, file = "data/df_both_waves.RData")
 
-save(montreal_cd_ct, file = "data/montreal_cd_ct.RData")
-save(montreal_fsa, file = "data/montreal_fsa.RData")
-save(survey_filter_cd, file = "data/survey_filter_cd.RData")
-save(l_trips_wave, file = "data/list_count_trips.RData")
 ```
