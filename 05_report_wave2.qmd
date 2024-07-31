@@ -115,319 +115,134 @@ knitr::opts_chunk$set(tab.topcaption = TRUE)
 ```{r readdata}
 #| include: false
 
-load(file = "data/montreal_cd_ct.RData")
-load(file = "data/montreal_fsa.RData")
-load(file = "data/survey_filter_cd.RData")
-load(file = "data/list_count_trips.RData")
+load(file = "data/df_both_waves.RData")
+load(file = "data/list_count_trips_wave.RData")
 
-df_vis_min <- data.table::fread("data/df_prop_vis_minority_by_age_statscan.csv")
-# montreal fsa
-# montreal_fsa <- sf::st_read("data/report/montreal_fsa_count.gpkg")
-# montreal cd (ct)
-# montreal_cd_ct <- sf::st_read("data/report/montreal_cd_ct_count.gpkg")
-# survey raw data
-n_obs_survey_raw <- data.table::fread("data/utscfiletransfer/Montreal_Corrected_Geocoding_2023_09_18.csv") %>% 
-  nrow()
-# survey geocoded
-n_obs_survey_geocoded <- 
-  sf::st_read("data/df_survey_montreal_filter_sf_new.gpkg") %>% 
-  nrow()
-# survey filtered data
-# survey_filter_cd <- sf::st_read("data/report/survey_filter_inside_cd.gpkg")
 ```
 
 
 
 <!-- START OF THE DOCUMENT -->
 
-# Initial information
-
-The original raw dataset contained `r n_obs_survey_raw` respondents, of which we were able to geocode `r n_obs_survey_geocoded` observations.
-`r n_obs_survey_geocoded - nrow(survey_filter_cd)` of them declared their residential location outside a 250 meter buffer around the island of Montreal (Census Division code equals to 2466), leaving us with `r nrow(survey_filter_cd)` respondents within the borders of the island and, therefore, in the final dataset. 
-A full description of survey design and sampling methodology is forthcoming. 
-
-# Survey's representation {#sec-spatial}
-
-```{r aggregateresultsfsa}
-#| include: false
-fsa <- montreal_fsa %>% 
-  select(geouid) %>% 
-  rename("fsa_geouid" = "geouid")
-ct <- montreal_cd_ct %>% 
-  select(geo_uid, count_lim_tot_parent, count_lim_tot_in_lim) %>% 
-  rename("ct_geo_uid" = "geo_uid")
-
-fsa_ct_join <- sf::st_join(fsa, ct)
-
-total_lim_sum <- sum(montreal_cd_ct$count_lim_tot_parent)
-
-fsa_ct_grouped <- fsa_ct_join %>% 
-  group_by(fsa_geouid) %>% 
-  summarise(
-    sum_lim_tot_parent = sum(count_lim_tot_parent, na.rm = T)
-    , sum_lim_tot_in_lim = sum(count_lim_tot_in_lim, na.rm = T)
-    , prop_tot_pop = sum_lim_tot_parent / total_lim_sum
-    , prop_tot_in_lim = sum_lim_tot_in_lim / total_lim_sum
-  )
-```
-
-## Demographics 
-
-The plot below shows comparisons of the survey’s representation according to selected demographics. Groups where the red dot is on the right are under-represented in the survey (i.e., the census’ relative population of a given group is greater than the survey’s), while groups where the blue dot is on the right are over-represented in the survey relative to the census. The survey, then, over-represents women, the control group (50-64 years old), and people below the low-income measure (LIM). Under-representation occurs for men, the treatment group (65 years or older), and visible minorities. 
-
-Differences in representation appear to be insignificant for most groups, with the notable exception of people with low-incomes and visible minorities. The former has a 13 p.p. over-representation, while the latter is under-represented by 16 p.p.. These differences put into question MJ’s capacity to assess the policy’s effectiveness for visible minorities, given their under-representation on the survey. This is an unfortunate situation, considering those are historically and structurally marginalized groups that suffer disproportionately with transport poverty and transport-related social exclusion, and that these groups would be target audiences for a policy that reduces the monetary burden of transportation such as the fare-free pass program. 
-
-
-```{r createcomptable}
-#| include: false
-obssurvey <- survey_filter_cd %>% nrow()
-
-census_age_sums <- montreal_cd_ct %>% 
-  st_drop_geometry() %>% 
-  select(matches("^age_(50_over|50_64|65_over)")) %>% 
-  summarise(across(everything(), ~ sum(., na.rm = T)))
-  
-
-survey_filter_cd %>% filter(age_corrected>=55L) %>% 
-  nrow()
-
-df_representation <- tibble(
-  prop_lim_census = sum(montreal_cd_ct$count_lim_tot_in_lim, na.rm = T) /
-    sum(montreal_cd_ct$count_lim_tot_parent, na.rm = T)
-  , prop_lim_survey = survey_filter_cd %>% filter(in_lim=="Yes") %>% nrow() /
-    obssurvey
-  
-  # , prop_vis_minority_45_over_census = df_vis_min$prop_vis_min_45_over
-  , prop_vis_minority_55_over_census = df_vis_min$prop_vis_min_55_over
-  # , prop_vis_minority_census = sum(montreal_cd_ct$tot_vis_minority_tot, na.rm = T) / sum(montreal_cd_ct$tot_vis_minority_tot_parent, na.rm = T)
-  , prop_vis_minority_55_over_survey = survey_filter_cd %>% filter(visible_minority=="Visible minority" & age_corrected>=55L) %>% nrow() /
-    survey_filter_cd %>% filter(age_corrected>=55L) %>% nrow()
-  , prop_male_census = sum(montreal_cd_ct$male_tot, na.rm = T) / sum(montreal_cd_ct$total_tot, na.rm = T)
-  , prop_male_survey = survey_filter_cd %>% filter(gender=="Male") %>% nrow() / obssurvey
-  , prop_female_census = sum(montreal_cd_ct$female_tot, na.rm = T) / sum(montreal_cd_ct$total_tot, na.rm = T)
-  , prop_female_survey = survey_filter_cd %>% filter(gender=="Female") %>% nrow() / obssurvey
-  , prop_age_50_64_tot_census = census_age_sums$age_50_64_tot / census_age_sums$age_50_over_tot
-  , prop_age_50_64_tot_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Control (50-64)") %>% nrow() / obssurvey
-  , prop_age_50_64_mal_census = census_age_sums$age_50_64_mal / census_age_sums$age_50_over_mal
-  , prop_age_50_64_mal_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Control (50-64)" & gender=="Male") %>% nrow() / survey_filter_cd %>% filter(gender=="Male") %>% nrow()
-  , prop_age_50_64_fem_census = census_age_sums$age_50_64_fem / census_age_sums$age_50_over_fem
-  , prop_age_50_64_fem_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Control (50-64)" & gender=="Female") %>% nrow() / survey_filter_cd %>% filter(gender=="Female") %>% nrow()
-  , prop_age_65_over_tot_census = census_age_sums$age_65_over_tot / census_age_sums$age_50_over_tot
-  , prop_age_65_over_tot_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)") %>% nrow() / obssurvey
-  , prop_age_65_over_mal_census = census_age_sums$age_65_over_mal / census_age_sums$age_50_over_mal
-  , prop_age_65_over_mal_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)" & gender=="Male") %>% nrow() / survey_filter_cd %>% filter(gender=="Male") %>% nrow()
-  , prop_age_65_over_fem_census = census_age_sums$age_65_over_fem / census_age_sums$age_50_over_fem
-  , prop_age_65_over_fem_survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)" & gender=="Female") %>% nrow() / survey_filter_cd %>% filter(gender=="Female") %>% nrow()
-  
-  # , prop_age_65_over_tot_census = census_age_sums$age_65_over_tot / census_age_sums$age_50_over_tot
-  # , prop_age_65_over_tot__survey = survey_filter_cd %>% filter(age_groups_control_treat=="Treatment (65-over)") %>% nrow() / obssurvey
-) %>% 
-  map_df(~round(., 2))
-
-df_representation_t <- df_representation %>%
-  pivot_longer(everything()) %>% 
-  separate_wider_regex(
-    cols = name
-    , c("prop_", Category = ".*", "_", Source = "(?:census|survey)")
-  ) %>% 
-  rename(Proportion = value) %>% 
-  mutate(
-    Category = case_when(
-      Category == "lim" ~ "In LIM"
-      , Category == "vis_minority_55_over" ~ "Visible Minority (55 or more)"
-      , Category == "male" ~ "Gender: Male"
-      , Category == "female" ~ "Gender: Female"
-      , Category == "age_50_64_tot" ~ "Age 50-64 (Total)"
-      , Category == "age_50_64_mal" ~ "Age 50-64 (Male)"
-      , Category == "age_50_64_fem" ~ "Age 50-64 (Female)"
-      , Category == "age_65_over_tot" ~ "Age 65+ (Total)"
-      , Category == "age_65_over_mal" ~ "Age 65+ (Male)"
-      , Category == "age_65_over_fem" ~ "Age 65+ (Female)"
-      , .default = "error"
-    )
-    , Source = case_when(
-      Source == "census" ~ "Census"
-      , .default = "Survey"
-    )
-  ) %>% 
-  arrange(Proportion, Source) %>% 
-  mutate(Category = as_factor(Category))
-
-```
-
-```{r, fig.align="center", fig.pos="H", fig.cap="Proportion of respondents by Source and Demographics"}
-#| echo: false
-#| label: fig-1-demographics-census-survey
-#| out-width: 100%
-#| fig-format: pdf
-#| fig-asp: 0.7
-#| fig-width: 7
-df_right_label <- df_representation_t %>% 
-  group_by(Category) %>% 
-  arrange(desc(Proportion)) %>% 
-  top_n(1) %>% 
-  mutate(pct = scales::percent(Proportion))
-
-df_left_label <- df_representation_t %>% 
-  group_by(Category) %>% 
-  arrange(desc(Proportion)) %>% 
-  slice(2) %>% 
-  mutate(pct = scales::percent(Proportion))
-
-df_representation_t %>% 
-  mutate(Category = factor(Category, levels = rev(df_right_label$Category))) %>% 
-  # arrange(Proportion, Source) %>% 
-  # mutate(Category = factor(Category)) 
-# %>% 
-  ggplot(aes(x = Proportion, y = Category)) +
-  geom_line(aes(group = Category), colour = "darkgrey") +
-  geom_point(aes(color = Source), size = 3) +
-  geom_text(
-    data = df_right_label
-    , aes(color = Source, label = pct)
-    , size = 3
-    , hjust = -0.5
-  ) +
-  geom_text(
-    data = df_left_label
-    , aes(color = Source, label = pct)
-    , size = 3
-    , hjust = +1.5
-  ) +
-  scale_x_continuous(
-    labels = scales::percent
-    , expand = expansion(mult = c(0.1, 0.125))
-    ) +
-  labs(
-    # title = "Proportion of respondents by Source and Demographics"
-    , y = "Demographics"
-  ) +
-  scale_colour_manual(values = c("Census" = "#ca0020", "Survey" = "#0571b0")) +
-  hrbrthemes::theme_ipsum(base_family = "roboto") +
-  theme(
-    panel.grid.major.y = element_blank()
-    , legend.position = "bottom"
-    , panel.background = element_rect(fill = "white", colour = "white"
-                                      , linetype = "solid", size = 0.5)
-    , plot.background = element_rect(fill = "white", colour = "white"
-                                      , linetype = "solid", size = 0.5)
-  )
-  
-```
-
-
-
-## Spatial 
-The two maps below give an overview of the spatial representation of survey. The map on the left shows how the relative proportion of the population below the Low Income Measure is spatially distributed in the Island of Montreal according to the 2021 Census. This group, which is most likely to benefit from the fare-free policy, is spatially concentrated on the eastern and northern parts of the island. The map on the right complements the former, showing the under and over-representation of the survey against the population over 50 years old according to the census. The survey’s over-representation appears to be located in the regions that concentrate groups from low-income households, while under-representation occurs in lower density and higher affluence areas of the island. 
-
-
-```{r, fig.align="center", fig.pos="H", fig.cap=c("On the left-hand side, population below the LIM according to the 2021 Canadian Census. On the right-hand side, under/over-representation ratio of survey respondents against the population over 50 years old in the Census.")}
-#| label: fig-2-under-over-fsa
-#| out-width: 100%
-#| fig-format: pdf
-#| fig-asp: 0.67
-#| fig-width: 8
-
-# layout-ncol: 2
-
-# "Population in LIM (Census)", "Under/over-representation ratio of survey respondents vs. population over 50"
-
-# quarto figures
-# https://r4ds.hadley.nz/quarto.html
-# plot scaling
-# https://quarto.org/docs/reference/cells/cells-knitr.html
-# multiple plots and captions
-# https://stackoverflow.com/a/41231696
-
-# fig-cap: "Under/over-representation: Ratio of the proportions of survey respondents vs. the population over 50 in each FSA (left)"
-
-tm_pop <- tm_shape(fsa_ct_grouped) +
-  tm_polygons(
-    col = "prop_tot_in_lim"
-    , style = "jenks"
-    , palette = "YlGnBu"
-    , border.alpha = 0.5
-    , alpha = 0.95
-    , title = "Proportion of Residents in LIM"
-  ) + 
-  tm_layout(
-    legend.width = 2
-    # , main.title = "Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
-    # , main.title.position = "center"
-    # , main.title.size = 1.05
-    , legend.title.size = 1.5
-    , legend.text.size = 1
-    , fontfamily = "roboto"
-  ) +
-  tm_compass(color.dark = "grey30", text.color = "grey30") +
-  tm_scale_bar(
-    breaks = c(0,2)
-    , color.dark = "grey30"
-    , text.color = "grey30"
-    , position = "left"
-    )
-
-tm_under_over <- tm_shape(montreal_fsa) + 
-  tm_polygons(
-    col = "under_over"
-    , breaks = c(0,0.5, 0.99, 1.01, 2, Inf)
-    , palette = "RdBu"
-    , border.alpha = 0.5
-    , alpha = 0.95
-    , labels = c("0.00-0.50: Survey under-representation","0.50-0.99", '0.99-1.01', '1.01-2.00', '2.00 or more: Over-representation')
-    , title = "Ratio: Survey/(Census)"
-    ) + 
-  # tm_text(
-  #   text = "label_survey"
-  #   , size = 0.3
-  #   # , col = "white"
-  #   ) + 
-  # tm_shape(montreal_fsa) +
-  # tm_text(
-  #     text = "label_census"
-  #     , size = 0.3
-  #     , ymod = -0.25
-  #     # , col = "black"
-  # ) +
-  tm_add_legend(
-    type = "text"
-  ) +
-  tm_layout(
-    legend.width = 2
-    # , main.title = "Ratio of the proportions of survey respondents vs. the population over 50 in each CT"
-    # , main.title.position = "center"
-    # , main.title.size = 1.05
-    , legend.title.size = 1.5
-    , legend.text.size = 1
-    , fontfamily = "roboto"
-  ) +
-  tm_compass(color.dark = "grey30", text.color = "grey30") +
-  tm_scale_bar(breaks = c(0,2), color.dark = "grey30", text.color = "grey30"
-               , position = "left")
-
-tmap_arrange(tm_pop, tm_under_over)
-```
-
-
-
 # Descriptive analysis
 
 
 ## Who took the survey?
 
-This subsection contains a general description of who took the first wave of the survey, according the descriptive statistics of some selected socio-demographics presented in the tables below.
-The first compares the relative proportion of control and treatment groups, and the proportion of the respondents in 5-year increments.
-The second compares control and treatment according to selected demographics.
+### Table response rate
 
-Control (50 to 64 years old) and treatment (65 years and over) are similarly represented. 
-Almost 90% of the respondents were between the ages of 50 and 74 years old, which means that investigations on the policy's effects on older stratifications of the population might be challenging.
+```{r tbldescriptiveresponserateage, tab.id="descriptive", tab.cap="Response rate between first and second wave"}
+#| echo: false
+#| tbl-cap: Response rate between first and second wave
 
+df_both %>% 
+  filter(wave=="First") %>% 
+  select(
+ response_rate,age_groups_control_treat, age_groups_5_all
+) %>% 
+  rename(
+    'Age groups (Control and Treatment)' = age_groups_control_treat
+    , "Age groups (5 years intervals)" = age_groups_5_all
+  ) %>% 
+  mutate(
+    `Age groups (5 years intervals)` = fct_recode(
+      `Age groups (5 years intervals)`
+      , `Age 50-54` = "age_50_54"
+      , `Age 55-59` = "age_55_59"
+      , `Age 60-64` = "age_60_64"
+      , `Age 65-69` = "age_65_69"
+      , `Age 70-74` = "age_70_74"
+      , `Age 75-79` = "age_75_79"
+      , `Age 80-84` = "age_80_84"
+      , `Age 85-89` = "age_85_89"
+      , `Age 90 and over` = "age_90_over"
+      )
+  ) %>% 
+  st_drop_geometry() %>% 
+  gtsummary::tbl_summary(
+    type = gtsummary::all_dichotomous() ~ "categorical"
+    , by = response_rate
+    , sort = list(
+      `Age groups (5 years intervals)` ~ "alphanumeric"
+      , `Age groups (Control and Treatment)` ~ "frequency"
+    ) 
+    # all_categorical() ~ "alphanumeric"
+    , missing_text = "Missing"
+  ) %>% 
+  gtsummary::modify_caption(caption = "Age groups of the respondents") %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+# gtsummary::as_gt() %>% 
+# gt::tab_options(table.font.names = "Arial")
+#%>% 
+# as_flex_table() 
+#%>% 
+# gtsummary::modify_header(label = "Demographics") %>% 
+# gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+```{r tbldescriptiveresponserateinvariable, tab.id="descriptive", tab.cap="Response rate between first and second wave"}
+#| echo: false
+#| tbl-cap: Response rate between first and second wave
+
+df_both %>% 
+  filter(wave == "First") %>% 
+  select(
+    response_rate
+  , visible_minority
+  , immigrant
+  , gender
+  , age_groups_control_treat
+  , educ_has_postsec
+) %>% 
+  rename(
+    "Visible minority" = visible_minority
+    , "Is Immigrant" = immigrant
+    , "Gender" = gender
+    , 'Age Groups Control Treat' = age_groups_control_treat
+    , "Has post-secondary education" = educ_has_postsec
+  ) %>% 
+  tbl_strata(
+    strata = response_rate
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          `Visible minority` ~ "frequency"
+          , `Is Immigrant` ~ "frequency"
+          , `Gender` ~ "frequency"
+          , `Has post-secondary education` ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Age Groups Control Treat`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+  )  %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+# gtsummary::as_gt() %>% 
+# gt::tab_options(table.font.names = "Arial")
+#%>% 
+# as_flex_table() 
+#%>% 
+# gtsummary::modify_header(label = "Demographics") %>% 
+# gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+### Table age
+
+This subsection contains a general description of who took the first wave of the survey...
 
 ```{r tbldescriptiveage, tab.id="descriptive", tab.cap="Descriptive statistics for categorical age groups"}
 #| echo: false
 #| tbl-cap: Descriptive statistics for categorical variables
 
-survey_filter_cd %>% select(
+df_both %>% select(
  age_groups_control_treat, age_groups_5_all
 ) %>% 
   rename(
@@ -470,102 +285,34 @@ survey_filter_cd %>% select(
   # gtsummary::modify_header(label = "Demographics") %>% 
   # gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
 ```
+### Table invariable characteristics through time
 
-
-Non-visible minority correspond the majority (90%) of the survey's respondents, and immigrants represented less than 20% of the total respondents. 
-These relative proportions might hinder the Pilot's capacity to evaluate the policy's impacts on these marginalized communities.
-Representation of women and men were equal.
-Almost a quarter of the individuals (364 of them) of the individuals declared to have at least a permanent functional limitation (which includes hearing or visual impairments, language or speech disorder, and mobility limitations that require the use of wheelchairs, to name a few). 
-Moreover, almost 8% (126) of the respondents declared having a mobility limitation, which is most commonly associated with transportation barriers and challenges regarding accessibility.
-
-The majority of the respondents had at least one level of post-secondary education (College or trade, school, CEGEP, Bachelor, Master or Doctorate degrees).
-Employment characteristics showed stark differences between control and treatment, which was not surprising.
-While 86% (668) of the respondents in the treatment group are retired, only a quarter (225) of the control group have done so.
-In contrast, more than half of the individuals from the control group have a full-time job, and 12% (105) of them have a part time job, while the proportions of those employed in part- or full-time jobs in the treatment group amount to 13% all together.
-Unemployment is significantly higher (4.4%) in the control group than in the treatment, since the proportion of people above 65 years old who declared being unemployed did not amount to 1% of them.
-
-The income distribution of control and treatment groups are similar, with some notable exceptions in the lowest income groups. 
-The proportion of people within the lowest income stratification (i.e., those earning less than \$15,000 annually) is higher for control (8.3%) than treatment.
-In contrast, the second lowest stratification (\$15,000-\$29,999) has a higher proportion from treatment (31%) than in the control (18%).
-One third of the respondents could be classified as having an income below the Low Income measure (LIM). 
-This population is most likely to benefit from the policy, which works in favor of the survey’s representation. 
-Almost half of the individuals lived in a single-person household. 
-
-Finally, almost 60% of the respondents declared having a vehicle in their households, while 40% of them did not have access to cars. 
-This study will be particularly interested in examining the impacts of the pass on the 487 respondents (33% of sample) who indicate living below the poverty line without access to a personal vehicle in the household, as these are the respondents most likely to be suffering from transport poverty and at risk of transport-related social exclusion. 
-
-
-```{r tbldescriptive, tab.id="descriptive", tab.cap="Descriptive statistics for categorical variables"}
+```{r tbldescriptiveinvariable, tab.id="descriptive", tab.cap="Descriptive statistics for categorical variables constant over time"}
 #| echo: false
-#| tbl-cap: Descriptive statistics for categorical variables
+#| tbl-cap: Descriptive statistics for categorical variables constant over time
 
-survey_filter_cd %>% select(
+df_both %>% filter(wave=="Second") %>% 
+  select(
   visible_minority
   , immigrant
   , gender
   , age_groups_control_treat
-  # , age_groups_5
-  # , age_groups_5_all
-  , any_mobility_limitation
-  , any_functional_limitation
-  
-  
-  # , employed
-  # , unemployed
   , educ_has_postsec
-  , employment
-  , income_groups
-  , in_lim
-  , lone_household
-  , has_vehicle_household
 ) %>% 
   rename(
     "Visible minority" = visible_minority
     , "Is Immigrant" = immigrant
     , "Gender" = gender
     , 'Age Groups Control Treat' = age_groups_control_treat
-    # , "Age groups" = age_groups_5_all
-    , "Any mobility limitation" = any_mobility_limitation
-    , "Any functional limitation" = any_functional_limitation
-    
-    # , "Employed" = employed
-    # , "Unemployed" = unemployed
     , "Has post-secondary education" = educ_has_postsec
-    , "Employment" = employment
-    , "Annual income groups" = income_groups
-    , "Household below LIM" = in_lim
-    , "Single-person household" = lone_household
-    , "Has Vehicle in Household" = has_vehicle_household
   ) %>% 
-  # mutate(
-  #   `Annual income groups` = fct_recode(
-  #     `Annual income groups`
-  #     , `Age 50-54` = "age_50_54"
-  #     , `Age 55-59` = "age_55_59"
-  #     , `Age 60-64` = "age_60_64"
-  #     , `Age 65-69` = "age_65_69"
-  #     , `Age 70-74` = "age_70_74"
-  #     , `Age 75-79` = "age_75_79"
-  #     , `Age 80-84` = "age_80_84"
-  #     , `Age 85-89` = "age_85_89"
-  #     , `Age 90 and over` = "age_90_over"
-  #     )
-  # ) %>%
-  st_drop_geometry() %>% 
   gtsummary::tbl_summary(
     type = gtsummary::all_dichotomous() ~ "categorical"
     , sort = list(
       `Visible minority` ~ "frequency"
       , `Is Immigrant` ~ "frequency"
       , `Gender` ~ "frequency"
-      , `Any mobility limitation` ~ "frequency"
-      , `Any functional limitation` ~ "frequency"
       , `Has post-secondary education` ~ "frequency"
-      , `Employment` ~ "frequency"
-      , `Annual income groups` ~ "alphanumeric"
-      , `Household below LIM` ~ "frequency"
-      , `Single-person household` ~ "frequency"
-      , `Has Vehicle in Household` ~ "frequency"
     )
       # all_categorical() ~ "frequency"
     , missing_text = "Missing"
@@ -587,7 +334,83 @@ survey_filter_cd %>% select(
 
 
 
+
+### Table VARIABLE demographics through time
+
+
+```{r tbldescriptivevariable, tab.id="descriptive", tab.cap="Descriptive statistics for categorical variables variable that vary over time"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for categorical variables variable that vary over time
+
+df_both %>% select(
+  wave
+  , age_groups_control_treat
+  , any_mobility_limitation
+  , any_functional_limitation
+  , employment
+  , income_groups
+  , in_lim
+  , lone_household
+  , has_vehicle_household
+) %>% 
+  rename(
+    'Age Groups Control Treat' = age_groups_control_treat
+    # , "Age groups" = age_groups_5_all
+    , "Any mobility limitation" = any_mobility_limitation
+    , "Any functional limitation" = any_functional_limitation
+    , "Employment" = employment
+    , "Annual income groups" = income_groups
+    , "Household below LIM" = in_lim
+    , "Single-person household" = lone_household
+    , "Has Vehicle in Household" = has_vehicle_household
+  ) %>% 
+  tbl_strata(
+    strata = wave
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          `Any mobility limitation` ~ "frequency"
+          , `Any functional limitation` ~ "frequency"
+          , `Employment` ~ "frequency"
+          , `Annual income groups` ~ "alphanumeric"
+          , `Household below LIM` ~ "frequency"
+          , `Single-person household` ~ "frequency"
+          , `Has Vehicle in Household` ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Age Groups Control Treat`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+  )  %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+# gtsummary::as_gt() %>% 
+# gt::tab_options(table.font.names = "Arial")
+#%>% 
+# as_flex_table() 
+#%>% 
+# gtsummary::modify_header(label = "Demographics") %>% 
+# gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+, any_mobility_limitation
+  , any_functional_limitation
+  , employment
+  , income_groups
+  , in_lim
+  , lone_household
+  
+
 ## What is their travel behavior?
+
+
+, has_vehicle_household
+
 
 ### Transit use, cost barriers, and suppressed demand
 
@@ -597,188 +420,16 @@ Regarding suppressed transit demand because of transit costs, control and treatm
 
 ```{r dfrename}
 #| echo: false
-df_rename <- survey_filter_cd 
+df_rename <- df_both 
 data.table::setDT(df_rename)
 df_rename[
   age_groups_control_treat == "Control (50-64)"
-  , has_free_pass := NA_character_
+  , has_free_pass_wave1 := NA_character_
 ]
 
-names(df_rename) <- gsub("_", " ", colnames(survey_filter_cd)) %>% 
+names(df_rename) <- gsub("_", " ", colnames(df_both)) %>% 
   str_to_title()
 df_rename <- df_rename %>% st_drop_geometry()
-```
-
-
-```{r crosstabbehavior}
-#| tbl-cap: crosstabbehavior
-
-# df_rename %>%
-# gtsummary::tbl_cross(
-#   col = `Age Groups Control Treat`
-#   , row = `Difficulty Transport Expenses`
-#   , percent = "cell"
-# )
-
-
-df_rename %>% 
-  select(`Age Groups Control Treat`
-         , `Has Free Pass`
-         , `Rides Transit As Would Like`
-         , `Has Cost Prevented Transit`
-         , `Difficulty Transport Expenses`
-         # , `Transit Barrier Cant Afford`
-         , `Suppressed Trip Alterantive Mode`
-         # , `Transit Barrier Cost Related`
-        ) %>% 
-  rename(
-    `Has Cost Prevented Transit?` = `Has Cost Prevented Transit`
-    , `Difficulty Paying Transport Expenses` = `Difficulty Transport Expenses`
-    ) %>% 
-  gtsummary::tbl_summary(
-    type = gtsummary::all_dichotomous() ~ "categorical"
-    , sort = all_categorical() ~ "frequency"
-    , missing_text = "Missing"
-    , by = `Age Groups Control Treat`
-  ) %>% 
-  gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
-  as_flex_table() %>% 
-  flextable::font(fontname = "Arial")
-```
-
-### Transit and activity satisfaction
-
-The table below displays satisfaction levels on transit and activity participation. The proportion of those in the treatment group that reported satisfaction with their activity levels is higher than in the control groups across all activity satisfaction categories. The Satisfaction Activity Participation variable represents a general level of satisfaction with activity participation.  It was formulated by amalgamating _Satisfaction with Community Events_, _Recreation_, and _Seeing Friends and Family_. Registering any dissatisfaction with one or more of these factors indicated a lack of contentment with levels of activity participation. There is an almost 12 p.p. difference in the proportion of individuals who declared being satisfied with their activity participation between seniors above 65 years old and those in the 50-64 group. Investigation of the behavior of these variables after the data collection of the second wave of the pilot is complete will give us great insight into the effects of the policy of fare-free for older adults.
-
-```{r crosstabsatisfaction}
-#| tbl-cap: crosstabsatisfaction
-
-df_rename %>% 
-  select(`Age Groups Control Treat`
-        , `Satisfied Transit`
-        # , `Confident Transit`
-        , `Satisfaction Community Events`
-        , `Satisfaction Recreation`
-        , `Satisfaction Seeing Friends Family`
-        , `Satisfaction Activity Participation`
-        ) %>% 
-  gtsummary::tbl_summary(
-    type = gtsummary::all_dichotomous() ~ "categorical"
-    , sort = all_categorical() ~ "frequency"
-    , missing_text = "Missing"
-    , by = `Age Groups Control Treat`
-  ) %>% 
-  gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>% 
-  as_flex_table() %>% 
-  flextable::font(fontname = "Arial")
-```
-
-Finally, it is important to note two things. First, these types of cross-tabulations can be made for other groups as well, such as LIM, Gender, Mobility Limitations, etc. Second, other variables were created during the coding of the dataset, which can give us insights into other aspects of travel behavior, such as most common trip modes, destinations, number of trips, to name a few. These were not included here due to time and space limitations but will be investigated in the fullness of time. 
-
-
-
-```{r summaryskim}
-#| tbl-cap: "Descriptive statistics of categorical variables"
-#| out-width: 100%
-# survey_filter_cd %>% select(
-#   visible_minority
-#   , gender
-#   , age_groups_control_treat
-#   , age_groups_5
-#   , lone_household
-#   , educ_has_postsec
-#   , employed
-#   , unemployed
-#   , employment
-#   , immigrant
-#   , any_mobility_limitation
-#   , any_functional_limitation
-#   , in_lim
-#   , has_vehicle_household
-# ) %>% 
-#   rename(
-#     "Visible minority" = visible_minority
-#     , "Gender" = gender
-#     , 'Control and treatment' = age_groups_control_treat
-#     , "Age groups" = age_groups_5
-#     , "Lone household" = lone_household
-#     , "Has post-education" = educ_has_postsec
-#     , "Employed" = employed
-#     , "Unemployed" = unemployed
-#     , "Employment" = employment
-#     , "Immigrant" = immigrant
-#     , "Any mobility limitation" = any_mobility_limitation
-#     , "Any functional limitation" = any_functional_limitation
-#     , "In LIM" = in_lim
-#     , "Has Vehicle in Household" = has_vehicle_household
-#   ) %>% 
-#   mutate(
-#     `Age groups` = fct_recode(`Age groups`, `Age 65 and over` = "age_65_over"
-#                               , `Age 60-64` = "age_60_64"
-#                               , `Age 55-59` = "age_55_59"
-#                               , `Age 50-54` = "age_50_54")
-#   ) %>% modelsummary::datasummary_skim(type = "categorical")
-```
-
-
-
-
-
-```{r plotbar, fig.align="center", fig.pos="H"}
-#| echo: false
-#| out-width: 100%
-#| fig-format: pdf
-#| fig-asp: 0.7
-#| fig-width: 7.5
-# survey_filter_cd %>% select(
-#   visible_minority
-#   , gender
-#   , age_groups_control_treat
-#   , age_groups_5
-#   , lone_household
-#   , educ_has_postsec
-#   , employed
-#   , unemployed
-#   , employment
-#   , immigrant
-#   , any_mobility_limitation
-#   , any_functional_limitation
-#   , in_lim
-#   , has_vehicle_household
-# ) %>% 
-#   rename(
-#     "Visible minority" = visible_minority
-#     , "Gender" = gender
-#     , 'Control and treatment' = age_groups_control_treat
-#     , "Age groups" = age_groups_5
-#     , "Lone household" = lone_household
-#     , "Has post-education" = educ_has_postsec
-#     , "Employed" = employed
-#     , "Unemployed" = unemployed
-#     , "Employment" = employment
-#     , "Immigrant" = immigrant
-#     , "Any mobility limitation" = any_mobility_limitation
-#     , "Any functional limitation" = any_functional_limitation
-#     , "In LIM" = in_lim
-#     , "Has Vehicle in Household" = has_vehicle_household
-#   ) %>% 
-#   mutate(
-#     `Age groups` = fct_recode(`Age groups`, `Age 65 and over` = "age_65_over"
-#                               , `Age 60-64` = "age_60_64"
-#                               , `Age 55-59` = "age_55_59"
-#                               , `Age 50-54` = "age_50_54")
-#   ) %>% 
-#   DataExplorer::plot_bar(
-#     data = .
-#     , ggtheme = theme(
-#       panel.background = element_rect(fill = "white", colour = "white"
-#                                       , linetype = "solid", size = 0.5)
-#       , plot.background = element_rect(fill = "white", colour = "white"
-#                                        , linetype = "solid", size = 0.5)
-#     )
-#     , nrow = 2L
-#     , ncol = 2L
-#   ) 
 ```
 
 
