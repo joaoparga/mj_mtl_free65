@@ -226,7 +226,7 @@ f_unique_sort <- function(df, var1){
 df_response_rate <- df_full %>% 
   select(response_id, v2_start_date) %>% 
   mutate(response_rate = as_factor(case_when(
-    !is.na(v2_start_date) ~ "Start wave 2"
+    !is.na(v2_start_date) ~ "Started wave 2"
     , .default = "Did not start wave 2"
   ))) %>% 
   select(-v2_start_date)
@@ -923,6 +923,7 @@ df_both <- df_both %>%
 
 
 
+
 ### Vars by mode_destination
 
 ```{r varsq22q96}
@@ -1214,7 +1215,7 @@ df_trips <- df_count %>%
     count = tidyr::replace_na(count, 0L)
     # identify transit trips
     , type = case_when(
-      mode %in% c("metro", "other_bus", "paratransit", "rail", "stm_bus", "rem") ~ "transit"
+      mode %in% c("metro", "paratransit", "rail", "stm_bus", "rem") ~ "transit"
       , mode %in% c("walk", "own_bike", "service_bike") ~ "active"
       , mode %in% c("own_car", "carsharing") ~ "car"
       , .default = "other"
@@ -1460,7 +1461,7 @@ lvls_income <- c(
   , "$210,000 or more"
 )
 
-lvls_response <- c("Did not start wave 2", "Start wave 2")
+lvls_response <- c("Did not start wave 2", "Started wave 2")
 ```
 
 
