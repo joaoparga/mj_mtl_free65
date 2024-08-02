@@ -89,6 +89,7 @@ library(showtext)
 library(sysfonts)
 library(hrbrthemes)
 library(flextable)
+# library(Z.gtsummary.addons)
 ```
 
 ```{r conflicts}
@@ -500,7 +501,7 @@ df_both %>% filter(response_rate=="Started wave 2") %>%
 ```
 
 
-### Transit use, cost barriers, and suppressed demand
+### Free pass and barriers 
 
 ```{r}
 df_both <- df_both %>% 
@@ -585,6 +586,119 @@ df_rename %>% filter(`Response Rate`=="Started wave 2") %>%
 # gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
 ```
 
+## Satisfaction
+
+```{r tblsatisfaction, tab.id="descriptive", tab.cap="Descriptive statistics for satisfaction"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for satisfaction
+
+df_rename %>% filter(`Response Rate`=="Started wave 2") %>%
+  select(
+    `Wave`
+    , `Age Groups Control Treat`
+    , `Satisfied Transit`
+    # , `Confident Transit`
+    , `Satisfaction Community Events`
+    , `Satisfaction Recreation`
+    , `Satisfaction Seeing Friends Family`
+    , `Satisfaction Activity Participation`
+    , `Could Stop Driving`
+    # , `Has Free Pass`
+    # , `Has Free Pass Wave1`
+    # , `Has Free Pass Wave2`
+    # , `Rides Transit As Would Like`
+    # , `Has Cost Prevented Transit`
+    # , `Difficulty Transport Expenses`  
+    # , `Count Dest`
+    # , `Count Modes`
+    # , `Count Trips Total`
+    # , `Count Trips Wave`
+    # , `Count Trips Type Transit`
+  ) %>% 
+  tbl_strata(
+    strata = `Age Groups Control Treat`
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Wave`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>% 
+      add_difference(everything() ~ "smd") %>%
+      # add_SMD(location = "both", ci = TRUE, decimals = 2) %>%
+      add_p(
+        # test = all_continuous() ~ "t.test"
+        , test.args = all_tests("chisq.test") ~ list(correct = TRUE)
+      ) %>%
+      # add a header to the statistic column, which is hidden by default
+      # adding the header will also unhide the column
+      modify_header() %>%
+      modify_fmt_fun(statistic ~ style_sigfig)
+  )
+
+```
+
+## trip behaviour
+
+```{r tbltripbehaviour, tab.id="descriptive", tab.cap="Descriptive statistics for trip behaviour"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for trip behaviour
+
+df_rename %>% filter(`Response Rate`=="Started wave 2") %>%
+  select(
+    `Wave`
+    , `Age Groups Control Treat`
+    # , `Satisfied Transit`
+    # # , `Confident Transit`
+    # , `Satisfaction Community Events`
+    # , `Satisfaction Recreation`
+    # , `Satisfaction Seeing Friends Family`
+    # , `Satisfaction Activity Participation`
+    # , `Could Stop Driving`
+    # , `Has Free Pass`
+    # , `Has Free Pass Wave1`
+    # , `Has Free Pass Wave2`
+    # , `Rides Transit As Would Like`
+    # , `Has Cost Prevented Transit`
+    # , `Difficulty Transport Expenses`  
+    , `Count Trips Wave`
+    , `Avg Trips Weekly Total`
+    , `Count Dest`
+    # , `Count Modes`
+    # , `Count Modes`
+    # , `Count Trips Total`
+    , `Count Trips Type Transit`
+    , `Count Trips Type Car`
+    , `Count Trips Type Active`
+  ) %>% 
+  tbl_strata(
+    strata = `Age Groups Control Treat`
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Wave`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>% 
+      add_difference(everything() ~ "smd") %>%
+      # add_SMD(location = "both", ci = TRUE, decimals = 2) %>%
+      add_p(
+        # test = all_continuous() ~ "t.test"
+        , test.args = all_tests("chisq.test") ~ list(correct = TRUE)
+      ) %>%
+      # add a header to the statistic column, which is hidden by default
+      # adding the header will also unhide the column
+      modify_header() %>%
+      modify_fmt_fun(statistic ~ style_sigfig)
+  )
+
+```
 
 CONTINUAR AQUI: INCLUIR SATISFACTION
 
