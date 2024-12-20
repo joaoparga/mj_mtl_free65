@@ -1,0 +1,760 @@
+---
+title: "Mobilizing Justice: Montreal Fair Pass Pilot"
+author:
+  - name: João Pedro Figueira Amorim Parga
+    orcid: 0000-0002-4105-5927
+    email: joao.parga@mail.utoronto.ca
+    affiliations:
+      - name: Mobilizing Justice Partnership
+format:
+  docx: 
+    reference-doc: custom-reference-doc.docx
+    toc: false
+    toc-depth: 2
+    number-sections: true
+  html:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    number_sections: true
+    code_folding: hide
+    theme: readable
+    embed-resources: true
+  pdf:
+    fig-width: 6
+    fig-asp: 0.618
+    number-sections: true
+    colorlinks: true
+    keeptex: true
+    include-in-header: 
+      text: |
+        \usepackage{booktabs}
+        \usepackage{siunitx}
+        \newcolumntype{d}{S[
+            input-open-uncertainty=,
+            input-close-uncertainty=,
+            parse-numbers = false,
+            table-align-text-pre=false,
+            table-align-text-post=false
+         ]}
+date: "last-modified"
+date-format: '[This version:] MMMM D, YYYY'
+abstract: "This version contains only the updated tables and visualizations from the new report. The text can be found at the onedrive link."
+csl: csl/american-sociological-association.csl
+tbl-cap-location: top
+number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: false
+editor:
+  mode: source
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = FALSE)
+# Use cache = TRUE if you want to speed up compilation
+
+knitr::opts_knit$set(output.format = "html")  # Set to "html" for HTML output
+
+# A function to allow for showing some of the inline code
+rinline <- function(code){
+  html <- '<code  class="r">``` `r CODE` ```</code>'
+  sub("CODE", code, html)
+}
+```
+
+```{r packages}
+#| echo: false
+#| include: false
+library(tidyverse)
+library(sf)
+library(data.table)
+library(janitor)
+library(fs)
+library(cancensus)
+library(tmap)
+library(DataExplorer)
+library(patchwork)
+library(mapview)
+library(modelsummary)
+library(kableExtra)
+library(knitr)
+library(gt)
+library(gtsummary)
+library(conflicted)
+library(stars)
+library(showtext)
+library(sysfonts)
+library(hrbrthemes)
+library(flextable)
+# library(Z.gtsummary.addons)
+```
+
+```{r conflicts}
+#| include: false
+select <- dplyr::select
+conflicted::conflicts_prefer(dplyr::filter)
+```
+
+```{r fonts}
+#| include: false
+#| # use different fonts
+sysfonts::font_add_google("Roboto", "roboto")
+showtext::showtext_auto()
+```
+
+
+```{r}
+knitr::opts_chunk$set(tab.topcaption = TRUE)
+```
+
+
+<!-- READ AND MANIPULATE DATA -->
+
+```{r readdata}
+#| include: false
+
+load(file = "data/df_both_waves.RData")
+load(file = "data/list_count_trips_wave.RData")
+
+```
+
+
+
+<!-- START OF THE DOCUMENT -->
+
+# Descriptive analysis
+
+
+## Who took the survey?
+
+### TAB response rate CONTROL X TREATMENT
+
+```{r}
+df_first <- df_both %>% 
+  filter(wave=="First")
+```
+
+contigency test between response rate and age_control_treatment variable
+```{r}
+pspearman::spearman.test(
+  df_first$response_rate, df_first$age_groups_control_treat
+  )
+```
+
+```{r tbldescriptiveresponserateage, tab.id="descriptive", tab.cap="Response rate between first and second wave"}
+#| echo: false
+#| tbl-cap: Response rate between first and second wave
+
+df_both %>% 
+  filter(wave=="First") %>% 
+  select(
+ response_rate,age_groups_control_treat, age_groups_5_all
+) %>% 
+  rename(
+    'Age groups (Control and Treatment)' = age_groups_control_treat
+    , "Age groups (5 years intervals)" = age_groups_5_all
+  ) %>% 
+  mutate(
+    `Age groups (5 years intervals)` = fct_recode(
+      `Age groups (5 years intervals)`
+      , `Age 50-54` = "age_50_54"
+      , `Age 55-59` = "age_55_59"
+      , `Age 60-64` = "age_60_64"
+      , `Age 65-69` = "age_65_69"
+      , `Age 70-74` = "age_70_74"
+      , `Age 75-79` = "age_75_79"
+      , `Age 80-84` = "age_80_84"
+      , `Age 85-89` = "age_85_89"
+      , `Age 90 and over` = "age_90_over"
+      )
+  ) %>% 
+  st_drop_geometry() %>% 
+  gtsummary::tbl_summary(
+    type = gtsummary::all_dichotomous() ~ "categorical"
+    , by = response_rate
+    , sort = list(
+      `Age groups (5 years intervals)` ~ "alphanumeric"
+      , `Age groups (Control and Treatment)` ~ "frequency"
+    ) 
+    # all_categorical() ~ "alphanumeric"
+    , missing_text = "Missing"
+  ) %>% 
+  gtsummary::modify_caption(caption = "Age groups of the respondents") %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+# gtsummary::as_gt() %>% 
+# gt::tab_options(table.font.names = "Arial")
+#%>% 
+# as_flex_table() 
+#%>% 
+# gtsummary::modify_header(label = "Demographics") %>% 
+# gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+### TAB response rate DEMOGRAPHICS
+
+contigency test between response rate and age_control_treatment variable
+```{r}
+pspearman::spearman.test(
+  df_first$response_rate, df_first$visible_minority
+  )
+
+```
+
+```{r}
+pspearman::spearman.test(
+  df_first$response_rate, df_first$immigrant
+  )
+```
+
+```{r tbldescriptiveresponserateinvariable, tab.id="descriptive", tab.cap="Response rate between first and second wave"}
+#| echo: false
+#| tbl-cap: Response rate between first and second wave
+
+df_both %>% 
+  filter(wave == "First") %>% 
+  select(
+    response_rate
+  , visible_minority
+  , immigrant
+  , gender
+  , age_groups_control_treat
+  , educ_has_postsec
+) %>% 
+  rename(
+    "Visible minority" = visible_minority
+    , "Is Immigrant" = immigrant
+    , "Gender" = gender
+    , 'Age Groups Control Treat' = age_groups_control_treat
+    , "Has post-secondary education" = educ_has_postsec
+  ) %>% 
+  tbl_strata(
+    strata = response_rate
+    , .header = "**{strata}, N = {N}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          `Visible minority` ~ "frequency"
+          , `Is Immigrant` ~ "frequency"
+          , `Gender` ~ "frequency"
+          , `Has post-secondary education` ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Age Groups Control Treat`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+  )  %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+# gtsummary::as_gt() %>% 
+# gt::tab_options(table.font.names = "Arial")
+#%>% 
+# as_flex_table() 
+#%>% 
+# gtsummary::modify_header(label = "Demographics") %>% 
+# gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+<!-- ### TAB age -->
+
+<!-- This subsection contains a general description of who took the first wave of the survey... -->
+
+<!-- ```{r tbldescriptiveage, tab.id="descriptive", tab.cap="Descriptive statistics for categorical age groups"} -->
+<!-- #| echo: false -->
+<!-- #| tbl-cap: Descriptive statistics for categorical variables -->
+
+<!-- df_both %>% select( -->
+<!--  age_groups_control_treat, age_groups_5_all -->
+<!-- ) %>%  -->
+<!--   rename( -->
+<!--     'Age groups (Control and Treatment)' = age_groups_control_treat -->
+<!--     , "Age groups (5 years intervals)" = age_groups_5_all -->
+<!--   ) %>%  -->
+<!--   mutate( -->
+<!--     `Age groups (5 years intervals)` = fct_recode( -->
+<!--       `Age groups (5 years intervals)` -->
+<!--       , `Age 50-54` = "age_50_54" -->
+<!--       , `Age 55-59` = "age_55_59" -->
+<!--       , `Age 60-64` = "age_60_64" -->
+<!--       , `Age 65-69` = "age_65_69" -->
+<!--       , `Age 70-74` = "age_70_74" -->
+<!--       , `Age 75-79` = "age_75_79" -->
+<!--       , `Age 80-84` = "age_80_84" -->
+<!--       , `Age 85-89` = "age_85_89" -->
+<!--       , `Age 90 and over` = "age_90_over" -->
+<!--       ) -->
+<!--   ) %>%  -->
+<!--   st_drop_geometry() %>%  -->
+<!--   gtsummary::tbl_summary( -->
+<!--     type = gtsummary::all_dichotomous() ~ "categorical" -->
+<!--     , sort = list( -->
+<!--       `Age groups (5 years intervals)` ~ "alphanumeric" -->
+<!--       , `Age groups (Control and Treatment)` ~ "frequency" -->
+<!--     )  -->
+<!--     # all_categorical() ~ "alphanumeric" -->
+<!--     , missing_text = "Missing" -->
+<!--   ) %>%  -->
+<!--   gtsummary::modify_caption(caption = "Age groups of the respondents") %>%  -->
+<!--   as_flex_table() %>%  -->
+<!--   flextable::font(fontname = "Arial") -->
+
+<!--   # gtsummary::as_gt() %>%  -->
+<!--   # gt::tab_options(table.font.names = "Arial") -->
+<!-- #%>%  -->
+<!--   # as_flex_table()  -->
+<!-- #%>%  -->
+<!--   # gtsummary::modify_header(label = "Demographics") %>%  -->
+<!--   # gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") -->
+<!-- ``` -->
+<!-- ### Table invariable characteristics through time -->
+
+<!-- ```{r tbldescriptiveinvariable, tab.id="descriptive", tab.cap="Descriptive statistics for categorical variables constant over time"} -->
+<!-- #| echo: false -->
+<!-- #| tbl-cap: Descriptive statistics for categorical variables constant over time -->
+
+<!-- df_both %>% filter(wave=="Second") %>%  -->
+<!--   select( -->
+<!--   visible_minority -->
+<!--   , immigrant -->
+<!--   , gender -->
+<!--   , age_groups_control_treat -->
+<!--   , educ_has_postsec -->
+<!-- ) %>%  -->
+<!--   rename( -->
+<!--     "Visible minority" = visible_minority -->
+<!--     , "Is Immigrant" = immigrant -->
+<!--     , "Gender" = gender -->
+<!--     , 'Age Groups Control Treat' = age_groups_control_treat -->
+<!--     , "Has post-secondary education" = educ_has_postsec -->
+<!--   ) %>%  -->
+<!--   gtsummary::tbl_summary( -->
+<!--     type = gtsummary::all_dichotomous() ~ "categorical" -->
+<!--     , sort = list( -->
+<!--       `Visible minority` ~ "frequency" -->
+<!--       , `Is Immigrant` ~ "frequency" -->
+<!--       , `Gender` ~ "frequency" -->
+<!--       , `Has post-secondary education` ~ "frequency" -->
+<!--     ) -->
+<!--       # all_categorical() ~ "frequency" -->
+<!--     , missing_text = "Missing" -->
+<!--     , by = `Age Groups Control Treat` -->
+<!--   ) %>%  -->
+<!--   gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>% -->
+<!--   gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>%  -->
+<!--   as_flex_table() %>%  -->
+<!--   flextable::font(fontname = "Arial") -->
+
+<!--   # gtsummary::as_gt() %>%  -->
+<!--   # gt::tab_options(table.font.names = "Arial") -->
+<!-- #%>%  -->
+<!--   # as_flex_table()  -->
+<!-- #%>%  -->
+<!--   # gtsummary::modify_header(label = "Demographics") %>%  -->
+<!--   # gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") -->
+<!-- ``` -->
+
+
+
+
+### Table time-variant socio-demographics
+
+
+```{r tbltimevariantdemographics, tab.id="descriptive", tab.cap="Descriptive statistics for categorical variables variable that vary over time"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for categorical variables variable that vary over time
+
+df_both %>% filter(response_rate=="Started wave 2") %>% 
+  select(
+  wave
+  , age_groups_control_treat
+  , any_mobility_limitation
+  , any_functional_limitation
+  , employment
+  , income_groups
+  , in_lim
+  , lone_household
+  , has_vehicle_household
+) %>% 
+  rename(
+    'Age Groups Control Treat' = age_groups_control_treat
+    # , "Age groups" = age_groups_5_all
+    , "Any mobility limitation" = any_mobility_limitation
+    , "Any functional limitation" = any_functional_limitation
+    , "Employment" = employment
+    , "Annual income groups" = income_groups
+    , "Household below LIM" = in_lim
+    , "Single-person household" = lone_household
+    , "Has Vehicle in Household" = has_vehicle_household
+  ) %>% 
+  tbl_strata(
+    strata = wave
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          `Any mobility limitation` ~ "frequency"
+          , `Any functional limitation` ~ "frequency"
+          , `Employment` ~ "frequency"
+          , `Annual income groups` ~ "alphanumeric"
+          , `Household below LIM` ~ "frequency"
+          , `Single-person household` ~ "frequency"
+          , `Has Vehicle in Household` ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Age Groups Control Treat`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+  )  %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+# gtsummary::as_gt() %>% 
+# gt::tab_options(table.font.names = "Arial")
+#%>% 
+# as_flex_table() 
+#%>% 
+# gtsummary::modify_header(label = "Demographics") %>% 
+# gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+, any_mobility_limitation
+  , any_functional_limitation
+  , employment
+  , income_groups
+  , in_lim
+  , lone_household
+  
+
+## What is their travel behavior?
+
+
+```{r tbltravelbehaviour, tab.id="descriptive", tab.cap="Descriptive statistics for categorical variables variable that vary over time"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for categorical variables variable that vary over time
+
+df_both %>% filter(response_rate=="Started wave 2") %>% 
+  select(
+  wave
+  , age_groups_control_treat
+  , any_mobility_limitation
+  , any_functional_limitation
+  , employment
+  , income_groups
+  , in_lim
+  , lone_household
+  , has_vehicle_household
+) %>% 
+  rename(
+    'Age Groups Control Treat' = age_groups_control_treat
+    # , "Age groups" = age_groups_5_all
+    , "Any mobility limitation" = any_mobility_limitation
+    , "Any functional limitation" = any_functional_limitation
+    , "Employment" = employment
+    , "Annual income groups" = income_groups
+    , "Household below LIM" = in_lim
+    , "Single-person household" = lone_household
+    , "Has Vehicle in Household" = has_vehicle_household
+  ) %>% 
+  tbl_strata(
+    strata = wave
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          `Any mobility limitation` ~ "frequency"
+          , `Any functional limitation` ~ "frequency"
+          , `Employment` ~ "frequency"
+          , `Annual income groups` ~ "alphanumeric"
+          , `Household below LIM` ~ "frequency"
+          , `Single-person household` ~ "frequency"
+          , `Has Vehicle in Household` ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Age Groups Control Treat`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+  )  %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+# gtsummary::as_gt() %>% 
+# gt::tab_options(table.font.names = "Arial")
+#%>% 
+# as_flex_table() 
+#%>% 
+# gtsummary::modify_header(label = "Demographics") %>% 
+# gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+
+### Free pass and barriers 
+
+```{r}
+df_both <- df_both %>% 
+  mutate(
+    has_free_pass = as_factor(case_when(
+      wave=="First" & 
+        q97 == "Yes" |
+        wave=="Second" & q111 == "Yes"
+        ~ "Yes"
+      , wave=="First" &
+        q97 %in% c("No, but I’m not planning to get it", "No, but I’m planning to get it soon") | 
+        wave=="Second" & q111 == "No"
+        ~ "No"
+      , .default = NA_character_
+    ))
+  ) 
+```
+
+
+```{r dfrename}
+#| echo: false
+df_rename <- df_both 
+data.table::setDT(df_rename)
+# df_rename[
+#   age_groups_control_treat == "Control (50-64)"
+#   , `:=`(has_free_pass_wave1 = NA_character_
+#       , has_free_pass_wave2 = NA_character_)
+# ]
+
+names(df_rename) <- gsub("_", " ", colnames(df_both)) %>% 
+  str_to_title()
+
+```
+
+```{r tbltravelbehaviourold, tab.id="descriptive", tab.cap="Descriptive statistics for travel behaviour variables"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for travel behaviour variables
+
+df_rename %>% filter(`Response Rate`=="Started wave 2") %>% 
+  select(
+  Wave
+  , `Age Groups Control Treat`
+  , `Has Vehicle Household`
+  , `Has Free Pass`
+  # , `Has Free Pass Wave1`
+  # , `Has Free Pass Wave2`
+  , `Rides Transit As Would Like`
+  , `Has Cost Prevented Transit`
+  , `Difficulty Transport Expenses`  
+) %>% 
+  rename(
+    , `Has Vehicle Household?` = `Has Vehicle Household`
+    , `Has Free Pass?` = `Has Free Pass`
+    , `Rides Transit As Would Like?` = `Rides Transit As Would Like`
+    , `Has Cost Prevented Transit?` = `Has Cost Prevented Transit`
+    , `Difficulty Paying Transport Expenses?` = `Difficulty Transport Expenses`
+    # , `Has Free Pass Wave I` = `Has Free Pass Wave1`
+    # , `Has Free Pass Wave II` = `Has Free Pass Wave2`
+  ) %>% 
+  tbl_strata(
+    strata = Wave
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Age Groups Control Treat`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+  )  %>% 
+  as_flex_table() %>% 
+  flextable::font(fontname = "Arial")
+
+# gtsummary::as_gt() %>% 
+# gt::tab_options(table.font.names = "Arial")
+#%>% 
+# as_flex_table() 
+#%>% 
+# gtsummary::modify_header(label = "Demographics") %>% 
+# gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables")
+```
+
+## Satisfaction
+
+```{r tblsatisfaction, tab.id="descriptive", tab.cap="Descriptive statistics for satisfaction"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for satisfaction
+
+df_rename %>% filter(`Response Rate`=="Started wave 2") %>%
+  select(
+    `Wave`
+    , `Age Groups Control Treat`
+    , `Satisfied Transit`
+    # , `Confident Transit`
+    , `Satisfaction Community Events`
+    , `Satisfaction Recreation`
+    , `Satisfaction Seeing Friends Family`
+    , `Satisfaction Activity Participation`
+    , `Could Stop Driving`
+    # , `Has Free Pass`
+    # , `Has Free Pass Wave1`
+    # , `Has Free Pass Wave2`
+    # , `Rides Transit As Would Like`
+    # , `Has Cost Prevented Transit`
+    # , `Difficulty Transport Expenses`  
+    # , `Count Dest`
+    # , `Count Modes`
+    # , `Count Trips Total`
+    # , `Count Trips Wave`
+    # , `Count Trips Type Transit`
+  ) %>% 
+  tbl_strata(
+    strata = `Age Groups Control Treat`
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Wave`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>% 
+      add_difference(everything() ~ "smd") %>%
+      # add_SMD(location = "both", ci = TRUE, decimals = 2) %>%
+      add_p(
+        # test = all_continuous() ~ "t.test"
+        , test.args = all_tests("chisq.test") ~ list(correct = TRUE)
+      ) %>%
+      # add a header to the statistic column, which is hidden by default
+      # adding the header will also unhide the column
+      modify_header() %>%
+      modify_fmt_fun(statistic ~ style_sigfig)
+  )
+
+```
+
+## trip behaviour
+
+```{r tbltripbehaviour, tab.id="descriptive", tab.cap="Descriptive statistics for trip behaviour"}
+#| echo: false
+#| tbl-cap: Descriptive statistics for trip behaviour
+
+df_rename %>% filter(`Response Rate`=="Started wave 2") %>%
+  select(
+    `Wave`
+    , `Age Groups Control Treat`
+    # , `Satisfied Transit`
+    # # , `Confident Transit`
+    # , `Satisfaction Community Events`
+    # , `Satisfaction Recreation`
+    # , `Satisfaction Seeing Friends Family`
+    # , `Satisfaction Activity Participation`
+    # , `Could Stop Driving`
+    # , `Has Free Pass`
+    # , `Has Free Pass Wave1`
+    # , `Has Free Pass Wave2`
+    # , `Rides Transit As Would Like`
+    # , `Has Cost Prevented Transit`
+    # , `Difficulty Transport Expenses`  
+    , `Count Trips Wave`
+    , `Avg Trips Weekly Total`
+    , `Count Dest`
+    # , `Count Modes`
+    # , `Count Modes`
+    # , `Count Trips Total`
+    , `Count Trips Type Transit`
+    , `Count Trips Type Car`
+    , `Count Trips Type Active`
+  ) %>% 
+  tbl_strata(
+    strata = `Age Groups Control Treat`
+    , .header = "**{strata}**"
+    , ~.x %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = all_categorical() ~ "frequency"
+        , missing_text = "Missing"
+        , by = `Wave`
+      ) %>% 
+      gtsummary::add_overall(last = T, col_label = "**Total**, N = {N}") %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>% 
+      add_difference(everything() ~ "smd") %>%
+      # add_SMD(location = "both", ci = TRUE, decimals = 2) %>%
+      add_p(
+        # test = all_continuous() ~ "t.test"
+        , test.args = all_tests("chisq.test") ~ list(correct = TRUE)
+      ) %>%
+      # add a header to the statistic column, which is hidden by default
+      # adding the header will also unhide the column
+      modify_header() %>%
+      modify_fmt_fun(statistic ~ style_sigfig)
+  )
+
+```
+
+CONTINUAR AQUI: INCLUIR SATISFACTION
+
+depois:
+- number of transit trips (difference)
+- diff in trips overall
+- % people agree stop driving
+
+t test?
+
+# Update
+
+## Old analysis (1st wave only (demographics?))
+
+```{r}
+# loaded free pass on card (treat and control)
+df_both %>% filter(wave=="Second") %>%  count(q111, age_groups_control_treat)
+```
+
+df_both %>% filter(wave=="Second") %>%  count(q111, age_groups_control_treat)
+
+
+## Update old (1st and 2nd wave combined)
+
+Awareness of free pass and how did that translate to its use
+```{r}
+# 1st wave
+df_both %>% filter(wave=="Second") %>%  count(awereness_free_pass, age_groups_control_treat)
+df_both %>% filter(wave=="Second") %>%  count(has_free_pass_wave1, age_groups_control_treat)
+df_both %>% filter(wave=="Second") %>%  count(has_free_pass_wave1_categories, age_groups_control_treat)
+
+# type of fare (available for 1st wave only)
+df_both %>% filter(wave=="Second" & has_free_pass_wave1 == "Yes") %>%  count(fare_type_before_pass_q98, age_groups_control_treat)
+df_both %>% filter(wave=="Second" & has_free_pass_wave1 == "Yes") %>%  count(fare_type_before_pass_q99, age_groups_control_treat)
+
+# 2nd wave
+# has free pass loaded
+df_both %>% filter(wave=="Second") %>%  count(q111, age_groups_control_treat)
+
+```
+
+
+## New analysis only (2nd wave only)
+
+
+# model
+
+```{r}
+free_1 <- df_both %>% filter(wave=="First"&age_groups_control_treat=="Treatment (65-over)"&has_free_pass_wave1=="Yes")
+free_no_1 <- df_both %>% filter(wave=="First"&age_groups_control_treat=="Treatment (65-over)"&has_free_pass_wave1=="No")
+free_2 <- df_both %>% filter(wave=="Second"&age_groups_control_treat=="Treatment (65-over)"&has_free_pass_wave2=="Yes")
+free_no_2 <- df_both %>% filter(wave=="Second"&age_groups_control_treat=="Treatment (65-over)"&has_free_pass_wave2=="No")
+
+yes_both <- free_1 %>% filter(response_id%in%free_2$response_id)
+no_both <- free_no_1 %>% filter(response_id%in%free_no_2$response_id)
+```
+
+
+
