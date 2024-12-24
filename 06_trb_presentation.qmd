@@ -111,7 +111,9 @@ knitr::opts_chunk$set(tab.topcaption = TRUE)
 ```
 
 
-<!-- READ AND MANIPULATE DATA -->
+# Read data
+
+## Survey
 
 ```{r readdata}
 #| include: false
@@ -121,6 +123,12 @@ load(file = "data/list_count_trips_wave.RData")
 
 ```
 
+
+## Statscan SAM (missing)
+
+```{r}
+
+```
 
 
 <!-- START OF THE DOCUMENT -->
@@ -135,6 +143,8 @@ load(file = "data/list_count_trips_wave.RData")
 ```{r}
 df_first <- df_both %>% 
   filter(wave=="First")
+df_second <- df_both %>% 
+  filter(wave=="Second")
 ```
 
 contigency test between response rate and age_control_treatment variable
@@ -757,4 +767,7 @@ no_both <- free_no_1 %>% filter(response_id%in%free_no_2$response_id)
 ```
 
 
+```{r}
+df_both %>% filter(wave=="Second"&response_rate=="Started wave 2") %>% count(q111,age_groups_control_treat)
+```
 
