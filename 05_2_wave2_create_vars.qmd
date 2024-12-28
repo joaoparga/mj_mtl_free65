@@ -341,7 +341,7 @@ df_wave1_only <- df_wave1_only %>%
       # q4 == "50-64" & age_raw == 65L ~ 64L
         q4 == "50-64" & q40 == "1974 or later" ~ 50L
       , q4 == "65 and older" & q40 == "1974 or later" ~ 50L
-      , q4 == "50-64" & q40 == "1958" ~ 64L
+      # , q4 == "50-64" & q40 == "1958" ~ 64L
       , .default = age_raw
     )
     # age categories
