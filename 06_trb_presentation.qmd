@@ -125,6 +125,26 @@ load(file = "data/list_count_trips_wave.RData")
 
 ```
 
+### filter both waves only
+
+```{r filter attrition}
+# keep only respondents who answered both waves
+df_attrition <- df_full %>% 
+  filter(response_rate=="Started wave 2")
+```
+
+
+
+### change age_corrected (and, thus, age_groups_control_treat)
+what to do with people age_raw = 65 and age_corrected = 64?
+A: do not change age_corrected based on q4 (binary what is your age: 50-64 or 65+)
+
+Obs.: I've changed 05_2_create_vars to remove the code that previously changed incorrectly 64 to 65 based on year of birth
+
+
+<!-- ```{r} -->
+<!-- df_both %>% filter(wave=="Second" & has_free_pass_wave2=="Yes" & age_groups_binary=="50-64") %>% count(age_raw, age_corrected) -->
+<!-- ``` -->
 
 ## Statscan SAM (missing)
 
@@ -133,28 +153,274 @@ load(file = "data/list_count_trips_wave.RData")
 ```
 
 
-<!-- START OF THE DOCUMENT -->
+# Define variables
+
+## treatment and control
+
+what to do with people 50-64 who declared having the free pass?
+
+IMPORTANT: ON WAVE 1, Q97 (Do you currently have the Free 65+ fare loaded on your Opus card?) WAS ONLY ASKED TO PEOPLE 65+
+i.e., 50-64 were not asked if they had the free card loaded on wave1
+
+Resolução provisória para a formatação long da base dados
+
+```{r}
+
+
+df_second <- df_attrition %>% 
+  filter(wave=="Second") %>% 
+  mutate(
+    treatment = case_when(
+    age_groups_binary == "65+" & has_free_pass_wave2 == "No" ~ 0L
+    , age_groups_binary == "65+" & has_free_pass_wave2 == "Yes" ~ 1L
+    , .default = NA_integer_
+  )
+  )
+
+df_first <- df_attrition %>% 
+  filter(wave=="First") %>% 
+  mutate(treatment = case_when(
+    response_id %in% setDT(df_second)[treatment==1L,response_id] ~ 1L
+    , response_id %in% setDT(df_second)[treatment==0L,response_id] ~ 0L
+    , .default = NA_integer_
+  ))
+
+df_both <- data.table::rbindlist(
+  list(df_first,df_second)
+)
+
+# OUTROS TIPOS DE TREATMENT & CONTROL (o t_c4 foi usado acima)
+# df_both <- df_both %>% mutate(
+#   # only 65+
+#   # control: t0: no pass; t1: no pass
+#   # treat: t0: no pass, t1: pass
+#     treatment_control_1 = case_when(
+#     age_groups_binary == "65+" & 
+#       has_free_pass_wave1 == "No" &
+#       has_free_pass_wave2 == "No" ~ "group_1"
+#     , age_groups_binary == "65+" & 
+#       has_free_pass_wave1 == "No" &
+#       has_free_pass_wave2 == "Yes" ~ "group_2"
+#     , .default = NA_character_
+#   )
+#   , treatment_control_2 = case_when(
+#     age_groups_binary == "50-64" ~ "group_1"
+#     , age_groups_binary == "65+" & has_free_pass_wave2 == "Yes" ~ "group_2"
+#     , age_groups_binary == "65+" & has_free_pass_wave2 == "No" ~ "group_3"
+#     , .default = NA_character_
+#   )
+#     , treatment_control_3 = case_when(
+#     age_groups_binary == "50-64" ~ "group_1"
+#     , age_groups_binary == "65+" & has_free_pass_wave2 == "Yes" ~ "group_2"
+#     , .default = NA_character_
+#   )
+#   # only 65+
+#   # control: t0: whatever; t1: no pass
+#   # treat: t0: whatever, t1: pass
+#   , treatment_control_4 = case_when(
+#     age_groups_binary == "65+" & has_free_pass_wave2 == "No" ~ "group_1"
+#     , age_groups_binary == "65+" & has_free_pass_wave2 == "Yes" ~ "group_2"
+#     , .default = NA_character_
+#   )
+#   , treatment_control_5 = case_when(
+#     age_groups_binary == "50-64" ~ "group_1"
+#     , age_groups_binary == "65+" ~ "group_2"
+#     , .default = NA_character_
+#   )
+# )
+```
+
+# filter by control/treatment
+
+```{r}
+df_tc <- df_both %>% filter(!is.na(treatment))
+```
+
+
+## outcomes
+
+- satisfaction with activity participation
+- transit usage
+- trip generation
+- subjective relationship to cost
+
+```{r}
+# relevel factors
+df_tc <- df_tc %>% 
+  mutate(
+    satisfaction_activity_participation = fct_relevel(
+      satisfaction_activity_participation
+      , c("Dissatisfied","Neither", "Satisfied"))
+    )
+```
+
+
+### change in satisfaction activity
+
+```{r}
+a <- df_tc %>% 
+  select(
+    response_id,wave,treatment,
+    satisfaction_activity_participation
+    , q109_3
+    ) %>% 
+  pivot_wider(
+    id_cols = c("response_id","treatment")
+    , names_from = wave
+    , values_from = c(satisfaction_activity_participation,q109_3)
+    # , names_prefix = "satisfaction_participation_"
+  ) %>% 
+  janitor::clean_names()
+
+a <- a %>% 
+  mutate(
+    shift_satisfaction_activity_lvls = case_when(
+      satisfaction_activity_participation_first == "Dissatisfied" &
+        satisfaction_activity_participation_second == "Neither" ~ 1L
+      , satisfaction_activity_participation_first == "Neither" &
+        satisfaction_activity_participation_second == "Satisfied" ~ 1L
+      , satisfaction_activity_participation_first == "Dissatisfied" &
+        satisfaction_activity_participation_second == "Satisfied" ~ 2L
+      , satisfaction_activity_participation_first == satisfaction_activity_participation_second ~ 0L
+      , satisfaction_activity_participation_first == "Satisfied" & 
+        satisfaction_activity_participation_second == "Neither" ~ -1L
+      , satisfaction_activity_participation_first == "Neither" & 
+        satisfaction_activity_participation_second == "Dissatisfied" ~ -1L
+      , satisfaction_activity_participation_first == "Satisfied" & 
+        satisfaction_activity_participation_second == "Dissatisfied" ~ -2L
+      , .default = NA_integer_
+    )
+    , shift_satisfaction_activity_bin = case_when(
+      shift_satisfaction_activity_lvls < 0L ~ -1L
+      , shift_satisfaction_activity_lvls == 0L ~ 0L
+      , shift_satisfaction_activity_lvls > 0L ~ 1L
+      , .default = NA_integer_
+    )
+    ,   shift_satisfaction_activity_bin2 = case_when(
+      satisfaction_activity_participation_first %in% c("Dissatisfied", "Neither") &
+        satisfaction_activity_participation_second == "Satisfied" ~ 1L
+      , satisfaction_activity_participation_first == satisfaction_activity_participation_second ~ 0L
+      , satisfaction_activity_participation_first %in% c("Neither","Satisfied") & 
+        satisfaction_activity_participation_second == "Dissatisfied" ~ -1L
+      , satisfaction_activity_participation_first == "Dissatisfied" &
+        satisfaction_activity_participation_second == "Neither" ~ 0L
+      , satisfaction_activity_participation_first == "Satisfied" &
+        satisfaction_activity_participation_second == "Neither" ~ 0L
+      , .default = NA_integer_
+    )
+  , shift_satisfaction_friends_family = case_when(
+    q109_3_first == "Strongly Disagree" &
+      q109_3_second %in% c(
+        "Disagree"
+        ,"Neither agree nor disagree"
+        ,"Agree"
+        , "Strongly Agree") ~ 1L
+    , q109_3_first == "Disagree" &
+      q109_3_second %in% c(
+        "Neither agree nor disagree"
+        ,"Agree"
+        , "Strongly Agree") ~ 1L
+    , q109_3_first == "Neither agree nor disagree" &
+      q109_3_second %in% c(
+        "Agree"
+        , "Strongly Agree") ~ 1L
+    , q109_3_first == "Agree" &
+      q109_3_second %in% c("Strongly Agree") ~ 1L
+    , q109_3_first == q109_3_second ~ 0L
+    , q109_3_first == "Strongly Agree" &
+      q109_3_second %in% c(
+        "Strongly Disagree"
+        , "Disagree"
+        ,"Neither agree nor disagree"
+        , "Agree") ~ -1L
+    , q109_3_first == "Agree" &
+      q109_3_second %in% c(
+        "Strongly Disagree"
+        , "Disagree"
+        ,"Neither agree nor disagree") ~ -1L
+    , q109_3_first == "Neither agree nor disagree" &
+      q109_3_second %in% c(
+        "Strongly Disagree"
+        , "Disagree") ~ -1L
+    , q109_3_first == "Disagree" &
+      q109_3_second %in% c("Strongly Disagree") ~ -1L
+    , .default = NA_integer_
+    )
+  )
+
+
+
+```
+
+
+### count trips wave
+
+```{r}
+# https://stackoverflow.com/a/68032070
+a <- df_both
+
+setDT(df_both)[
+  ,
+  diff_trips_wave := count_trips_wave - shift(count_trips_wave)
+  , by = .(response_id)
+]
+```
+
+
 
 # Descriptive analysis
 
-## filter attrition
 
-```{r filter attrition}
-# keep only respondents who answered both waves
-df_both <- df_full %>% 
-  filter(response_rate=="Started wave 2")
-```
+## age histogram
 
-
-
-## change age_corrected (and, thus, age_groups_control_treat)
-what to do with people age_raw = 65 and age_corrected = 64?
-A: do not change age_corrected based on q4 (binary what is your age: 50-64 or 65+)
-
-In any case, I NEED TO PROPERLY DEFINE TREATMENT AND CONTROL
+age histogram
 ```{r}
-df_both %>% filter(wave=="Second" & has_free_pass_wave2=="Yes" & age_groups_control_treat=="Control (50-64)") %>% count(age_raw)
-df_both %>% filter(wave=="Second" & has_free_pass_wave2=="Yes" & age_groups_control_treat=="Control (50-64)") %>% count(age_raw)
+df_both %>% filter(wave=="First") %>% ggplot(aes(x=age_corrected))+geom_histogram(binwidth = 1)+scale_x_continuous(breaks = seq(50,100,5))
 ```
+
+
+# fisher exact test
+
+## q101 (cost ever prevented using transit)
+
+```{r}
+# two options
+df_q101 <- df_both %>% filter(wave=="Second" & q101!="Prefer not to answer")
+
+stats::fisher.test(table(df_q101$treatment_control_4, df_q101$q101))
+
+# or
+df <- data.frame(
+  "q101_no" = c(71, 353)
+  ,"q101_yes" = c(6, 122)
+  ,row.names = c("control", "treatment") 
+  , stringsAsFactors = F
+)
+stats::fisher.test(df)
+
+```
+
+
+## diff trips per wave
+
+```{r}
+
+df_diff_trips_wave <- df_both %>% 
+  filter(wave=="Second")
+
+
+
+stats::fisher.test(table(
+  df_diff_trips_wave$treatment_control_4
+  , df_diff_trips_wave$diff_trips_wave)
+  , simulate.p.value = T
+  , B = 100000L
+  )
+
+```
+
+# multivariate model
+
+
 
 

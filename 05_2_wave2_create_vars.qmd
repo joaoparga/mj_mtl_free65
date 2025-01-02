@@ -366,12 +366,12 @@ df_wave1_only <- df_wave1_only %>%
       , age_corrected >= 90L ~ "age_90_over"
       , .default = NA_character_
     ))
-    , age_groups_control_treat = case_when(
+    , age_groups_binary = case_when(
       age_corrected < 50L ~ "age_less_50"
-      , age_corrected >= 50L & age_corrected <= 64L ~ "Control (50-64)"
-      , age_corrected >= 65L ~ "Treatment (65-over)" 
-      , q40 == "Prefer not to answer" & q4 == "50-64" ~ "Control (50-64)"
-      , q40 == "Prefer not to answer" & q4 == "65 and older" ~ "Treatment (65-over)"
+      , age_corrected >= 50L & age_corrected <= 64L ~ "50-64"
+      , age_corrected >= 65L ~ "65+" 
+      , q40 == "Prefer not to answer" & q4 == "50-64" ~ "50-64"
+      , q40 == "Prefer not to answer" & q4 == "65 and older" ~ "65+"
       , .default = NA_character_
     )
     
