@@ -1217,8 +1217,9 @@ df_trips <- df_count %>%
     , type = case_when(
       mode %in% c("metro", "paratransit", "rail", "stm_bus", "rem") ~ "transit"
       , mode %in% c("walk", "own_bike", "service_bike") ~ "active"
-      , mode %in% c("own_car", "carsharing") ~ "car"
-      , .default = "other"
+      , mode %in% c("own_car", "carsharing", "carpooling") ~ "car"
+      , mode %in% c("other_bus", "motorcycle", "taxi") ~ "other"
+      , .default = NA_character_
     )
     )
 
@@ -1309,36 +1310,82 @@ df_trips_dest_wide <- df_trips_dest %>%
 
 # main dest, mode, type
    # LATER: HOW TO DEALT WITH TIES?
-df_main_ind_trip <- df_trips[, .SD[which.max(count)], by = .(response_id,wave)]
+# https://stackoverflow.com/a/24558696
 
+# dest
 data.table::setDT(df_trips_dest)
-df_main_trip_dest <- df_trips_dest[, .SD[which.max(count_trips_dest)], by = .(response_id, wave)] %>% 
-  mutate(
-    main_dest = case_when(
-      count_trips_dest == 0L ~ NA_character_
-      , .default = dest
-    )
-      )
+df_main_trip_dest <- df_trips_dest[
+  df_trips_dest[, .I[which.max(count_trips_dest)], by =.(response_id,wave)]$V1
+]
+
+df_main_trip_dest <- df_main_trip_dest %>% 
+  mutate(main_dest = case_when(
+    count_trips_dest == 0L ~ NA_character_
+    , .default = dest
+  ))
+
+
+# mode
+data.table::setDT(df_trips_mode)
 
 data.table::setDT(df_trips_mode)
-df_main_trip_mode <- df_trips_mode[, .SD[which.max(count_trips_mode)], by = .(response_id,wave)] %>% 
-  mutate(
-    main_mode = case_when(
-      count_trips_mode == 0L ~ NA_character_
-      , .default = mode
-    )
-  )
+df_main_trip_mode <- df_trips_mode[
+  df_trips_mode[, .I[which.max(count_trips_mode)], by =.(response_id,wave)]$V1
+]
 
+df_main_trip_mode <- df_main_trip_mode %>% 
+  mutate(main_mode = case_when(
+    count_trips_mode == 0L ~ NA_character_
+    , .default = mode
+  ))
+
+# type
 data.table::setDT(df_trips_type)
-df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(response_id,wave)] %>% 
-  mutate(
-    main_type = case_when(
-      count_trips_type == 0L ~ NA_character_
-      , .default = type
-    )
-  )
 
+df_main_trip_type <- df_trips_type[
+  df_trips_type[, .I[which.max(count_trips_type)], by =.(response_id,wave)]$V1
+  ]
+
+df_main_trip_type <- df_main_trip_type %>% 
+  mutate(main_type = case_when(
+    count_trips_type == 0L ~ NA_character_
+    , .default = type
+  ))
+
+
+
+
+# df_main_ind_trip <- df_trips[, .SD[which.max(count)], by = .(response_id,wave)]
+# # OLD WAY (possibly wrong)
+# data.table::setDT(df_trips_dest)
+# df_main_trip_dest <- df_trips_dest[, .SD[which.max(count_trips_dest)], by = .(response_id, wave)] %>% 
+#   mutate(
+#     main_dest = case_when(
+#       count_trips_dest == 0L ~ NA_character_
+#       , .default = dest
+#     )
+#       )
 # 
+# data.table::setDT(df_trips_mode)
+# df_main_trip_mode <- df_trips_mode[, .SD[which.max(count_trips_mode)], by = .(response_id,wave)] %>% 
+#   mutate(
+#     main_mode = case_when(
+#       count_trips_mode == 0L ~ NA_character_
+#       , .default = mode
+#     )
+#   )
+# 
+# data.table::setDT(df_trips_type)
+# df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(response_id,wave)] %>% 
+#   mutate(
+#     main_type = case_when(
+#       count_trips_type == 0L ~ NA_character_
+#       , .default = type
+#     )
+#   )
+
+
+
 # df_main <- df_main %>% 
 #   # filter(!count == 0L) %>% 
 #   mutate(
@@ -1373,7 +1420,7 @@ df_main_trip_type <- df_trips_type[, .SD[which.max(count_trips_type)], by = .(re
     , "df_trips_type_wide" = df_trips_type_wide
     , 'df_trips_dest' = df_trips_dest
     , 'df_trips_dest_wide' = df_trips_dest_wide
-    , "df_main_ind_trip" = df_main_ind_trip
+    # , "df_main_ind_trip" = df_main_ind_trip
     , "df_main_trip_dest" = df_main_trip_dest
     , "df_main_trip_mode" = df_main_trip_mode
     , "df_main_trip_type" = df_main_trip_type

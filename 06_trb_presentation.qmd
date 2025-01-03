@@ -89,7 +89,12 @@ library(showtext)
 library(sysfonts)
 library(hrbrthemes)
 library(flextable)
+library(rstatix)
 # library(Z.gtsummary.addons)
+
+`%nin%` = Negate(`%in%`)
+
+`%nlike%` = Negate(`%like%`)
 ```
 
 ```{r conflicts}
@@ -154,6 +159,14 @@ Obs.: I've changed 05_2_create_vars to remove the code that previously changed i
 
 
 # Define variables
+
+## age histogram
+
+age histogram
+```{r}
+df_attrition %>% filter(wave=="First") %>% ggplot(aes(x=age_corrected))+geom_histogram(binwidth = 1)+scale_x_continuous(breaks = seq(50,100,5))
+```
+
 
 ## treatment and control
 
@@ -239,9 +252,13 @@ df_tc <- df_both %>% filter(!is.na(treatment))
 
 ## outcomes
 
+OK
 - satisfaction with activity participation
+
 - transit usage
 - trip generation
+
+OK
 - subjective relationship to cost
 
 ```{r}
@@ -258,30 +275,31 @@ df_tc <- df_tc %>%
 ### change in satisfaction activity
 
 ```{r}
-a <- df_tc %>% 
+df_outcome_participation <- df_tc %>% 
   select(
     response_id,wave,treatment,
     satisfaction_activity_participation
-    , q109_3
+    , q109_3, q109_4, q109_5
     ) %>% 
   pivot_wider(
     id_cols = c("response_id","treatment")
     , names_from = wave
-    , values_from = c(satisfaction_activity_participation,q109_3)
+    , values_from = c(satisfaction_activity_participation,q109_3, q109_4, q109_5)
     # , names_prefix = "satisfaction_participation_"
   ) %>% 
   janitor::clean_names()
 
-a <- a %>% 
+df_outcome_participation <- df_outcome_participation %>% 
   mutate(
-    shift_satisfaction_activity_lvls = case_when(
+    delta_satisfaction_activity_lvls = case_when(
       satisfaction_activity_participation_first == "Dissatisfied" &
         satisfaction_activity_participation_second == "Neither" ~ 1L
       , satisfaction_activity_participation_first == "Neither" &
         satisfaction_activity_participation_second == "Satisfied" ~ 1L
       , satisfaction_activity_participation_first == "Dissatisfied" &
         satisfaction_activity_participation_second == "Satisfied" ~ 2L
-      , satisfaction_activity_participation_first == satisfaction_activity_participation_second ~ 0L
+      , satisfaction_activity_participation_first == 
+        satisfaction_activity_participation_second ~ 0L
       , satisfaction_activity_participation_first == "Satisfied" & 
         satisfaction_activity_participation_second == "Neither" ~ -1L
       , satisfaction_activity_participation_first == "Neither" & 
@@ -290,13 +308,13 @@ a <- a %>%
         satisfaction_activity_participation_second == "Dissatisfied" ~ -2L
       , .default = NA_integer_
     )
-    , shift_satisfaction_activity_bin = case_when(
-      shift_satisfaction_activity_lvls < 0L ~ -1L
-      , shift_satisfaction_activity_lvls == 0L ~ 0L
-      , shift_satisfaction_activity_lvls > 0L ~ 1L
+    , delta_satisfaction_activity_bin = case_when(
+      delta_satisfaction_activity_lvls < 0L ~ -1L
+      , delta_satisfaction_activity_lvls == 0L ~ 0L
+      , delta_satisfaction_activity_lvls > 0L ~ 1L
       , .default = NA_integer_
     )
-    ,   shift_satisfaction_activity_bin2 = case_when(
+    ,   delta_satisfaction_activity_bin2 = case_when(
       satisfaction_activity_participation_first %in% c("Dissatisfied", "Neither") &
         satisfaction_activity_participation_second == "Satisfied" ~ 1L
       , satisfaction_activity_participation_first == satisfaction_activity_participation_second ~ 0L
@@ -308,7 +326,7 @@ a <- a %>%
         satisfaction_activity_participation_second == "Neither" ~ 0L
       , .default = NA_integer_
     )
-  , shift_satisfaction_friends_family = case_when(
+  , delta_satisfaction_friends_family = case_when(
     q109_3_first == "Strongly Disagree" &
       q109_3_second %in% c(
         "Disagree"
@@ -346,59 +364,405 @@ a <- a %>%
       q109_3_second %in% c("Strongly Disagree") ~ -1L
     , .default = NA_integer_
     )
+  , delta_satisfaction_recreation = case_when(
+  q109_4_first == "Strongly Disagree" &
+    q109_4_second %in% c(
+      "Disagree"
+      ,"Neither agree nor disagree"
+      ,"Agree"
+      , "Strongly Agree") ~ 1L
+  , q109_4_first == "Disagree" &
+    q109_4_second %in% c(
+      "Neither agree nor disagree"
+      ,"Agree"
+      , "Strongly Agree") ~ 1L
+  , q109_4_first == "Neither agree nor disagree" &
+    q109_4_second %in% c(
+      "Agree"
+      , "Strongly Agree") ~ 1L
+  , q109_4_first == "Agree" &
+    q109_4_second %in% c("Strongly Agree") ~ 1L
+  , q109_4_first == q109_4_second ~ 0L
+  , q109_4_first == "Strongly Agree" &
+    q109_4_second %in% c(
+      "Strongly Disagree"
+      , "Disagree"
+      ,"Neither agree nor disagree"
+      , "Agree") ~ -1L
+  , q109_4_first == "Agree" &
+    q109_4_second %in% c(
+      "Strongly Disagree"
+      , "Disagree"
+      ,"Neither agree nor disagree") ~ -1L
+  , q109_4_first == "Neither agree nor disagree" &
+    q109_4_second %in% c(
+      "Strongly Disagree"
+      , "Disagree") ~ -1L
+  , q109_4_first == "Disagree" &
+    q109_4_second %in% c("Strongly Disagree") ~ -1L
+  , .default = NA_integer_
+  )
+  , delta_satisfaction_attend_events = case_when(
+  q109_5_first == "Strongly Disagree" &
+    q109_5_second %in% c(
+      "Disagree"
+      ,"Neither agree nor disagree"
+      ,"Agree"
+      , "Strongly Agree") ~ 1L
+  , q109_5_first == "Disagree" &
+    q109_5_second %in% c(
+      "Neither agree nor disagree"
+      ,"Agree"
+      , "Strongly Agree") ~ 1L
+  , q109_5_first == "Neither agree nor disagree" &
+    q109_5_second %in% c(
+      "Agree"
+      , "Strongly Agree") ~ 1L
+  , q109_5_first == "Agree" &
+    q109_5_second %in% c("Strongly Agree") ~ 1L
+  , q109_5_first == q109_5_second ~ 0L
+  , q109_5_first == "Strongly Agree" &
+    q109_5_second %in% c(
+      "Strongly Disagree"
+      , "Disagree"
+      ,"Neither agree nor disagree"
+      , "Agree") ~ -1L
+  , q109_5_first == "Agree" &
+    q109_5_second %in% c(
+      "Strongly Disagree"
+      , "Disagree"
+      ,"Neither agree nor disagree") ~ -1L
+  , q109_5_first == "Neither agree nor disagree" &
+    q109_5_second %in% c(
+      "Strongly Disagree"
+      , "Disagree") ~ -1L
+  , q109_5_first == "Disagree" &
+    q109_5_second %in% c("Strongly Disagree") ~ -1L
+  , .default = NA_integer_
+)
   )
 
 
 
 ```
 
+### change in relationship to cost
+
+```{r}
+df_outcome_cost <- df_tc %>% 
+  select(
+    response_id,wave,treatment
+# Has the cost of transit ever prevented you from taking a trip using public transit?    
+    , q101
+# Would you say you are riding transit as much as you would like?
+    , q100
+# q25 asked only to those who answered Yes to q100
+# derived from q25: What prevents you from using transit as much as you would like
+# if answer is i) nor worth the cost; or ii) i can't afford it
+    , transit_barrier_cost_related
+    ) %>% 
+  pivot_wider(
+    id_cols = c("response_id","treatment")
+    , names_from = wave
+    , values_from = c(q100, q101, transit_barrier_cost_related)
+    # , names_prefix = "satisfaction_participation_"
+  ) %>% 
+  janitor::clean_names()
+
+df_outcome_cost <- df_outcome_cost %>% 
+  mutate(
+    delta_rides_enough_transit = case_when(
+      q100_first == q100_second ~ 0L
+      
+      , q100_first == "No" &
+        q100_second == "Yes" ~ 1L
+      
+      , q100_first == "Yes" &
+        q100_second == "No" ~ -1L
+      
+      , .default = NA_integer_
+    )
+    , delta_cost_prevented_transit = case_when(
+      q101_first == q101_second ~ 0L
+      
+      , q101_first == "No" &
+        q101_second == "Yes" ~ 1L
+      
+      , q101_first == "Yes" &
+        q101_second == "No" ~ -1L
+      
+      , .default = NA_integer_
+    )
+    , delta_transit_barrier_cost = case_when(
+      transit_barrier_cost_related_first == transit_barrier_cost_related_second ~ 0L
+      , transit_barrier_cost_related_first == "No" &
+        transit_barrier_cost_related_second == "Yes" ~ 1L
+      , transit_barrier_cost_related_first == "Yes" &
+        transit_barrier_cost_related_second == "No" ~ -1L
+      , .default = NA_integer_
+    )
+  )
+  
+```
 
 ### count trips wave
 
 ```{r}
-# https://stackoverflow.com/a/68032070
-a <- df_both
+df_outcome_trips <- df_tc %>% 
+  select(
+    response_id,wave,treatment,
+    starts_with("count")
+    , -c("count_trips_total")
+    ) %>% 
+  pivot_wider(
+    id_cols = c("response_id","treatment")
+    , names_from = wave
+    , values_from = starts_with("count")
+    # , names_prefix = "satisfaction_participation_"
+  ) %>% 
+  janitor::clean_names()
 
-setDT(df_both)[
-  ,
-  diff_trips_wave := count_trips_wave - shift(count_trips_wave)
-  , by = .(response_id)
-]
+colunas <- df_tc %>%
+  select(starts_with("count"), , -c("count_trips_total")) %>% 
+  colnames() %>% 
+  str_extract("(?<=count_).*")
+
+df_outcome_trips[paste0("delta_", colunas)] <- 
+  map2(
+    df_outcome_trips %>% select(ends_with("first"))
+    , df_outcome_trips %>% select(ends_with("second"))
+    ,~.x - .y
+    )
+
+```
+
+
+<!-- ```{r} -->
+<!-- # https://stackoverflow.com/a/68032070 -->
+<!-- df_outcome_trips <- df_both -->
+
+<!-- setDT(df_outcome_trips)[ -->
+<!--   , -->
+<!--   diff_trips_wave := count_trips_wave - shift(count_trips_wave) -->
+<!--   , by = .(response_id) -->
+<!-- ] -->
+<!-- ``` -->
+
+### used active or transit as main_type?
+
+```{r}
+df_outcome_main <- df_tc %>% 
+  select(
+    response_id,wave,treatment
+    # ,main_dest
+    , main_mode
+    , main_type
+    ) %>% 
+  pivot_wider(
+    id_cols = c("response_id","treatment")
+    , names_from = wave
+    , values_from = starts_with("main")
+    # , names_prefix = "satisfaction_participation_"
+  ) %>% 
+  janitor::clean_names()
+
+df_outcome_main <- df_outcome_main %>% 
+  mutate(
+    delta_type = case_when(
+      main_type_first == main_type_second ~ 0L
+      , main_type_first == "transit" &
+        main_type_second %nin% c("transit") ~ -1L
+      , main_type_first %nin% c("transit") &
+        main_type_second %in% c("transit") ~ 1L
+      , .default = NA_integer_
+    )
+    , new_type = case_when(
+      main_type_first == main_type_second ~ "same"
+      
+      , (main_type_first != "active" |
+        is.na(main_type_first)) &
+        main_type_second == "active" ~ "new_active"
+      
+      , (main_type_first != "car" |
+        is.na(main_type_first)) &
+        main_type_second == "car" ~ "new_car"
+      
+      , (main_type_first != "transit" |
+        is.na(main_type_first)) &
+        main_type_second == "transit" ~ "new_transit"
+      
+      , (main_type_first != "other" |
+        is.na(main_type_first)) &
+        main_type_second == "other" ~ "new_other"
+      
+      , .default = NA_character_
+    )
+    
+    # , delta_type_broad = case_when(
+    #   main_type_first == main_type_second ~ 0L
+    #   , main_type_first %in% c("active","transit") &
+    #     main_type_second == "car" ~ -1L
+    #   , main_type_first == "car" &
+    #     main_type_second %in% c("active","transit") ~ 1L
+    #   , .default = NA_integer_
+    # )
+    # , delta_type_strict = case_when(
+    #   main_type_first == main_type_second ~ "same"
+    #   , main_type_first %in% c("car", "active", "other") &
+    #     main_type_second == "transit" ~ "transit"
+    #   , main_type_first %in% c("transit", "active", "other") &
+    #     main_type_second == "car" ~ "car"
+    #   , main_type_first %in% c("car", "active", "other") &
+    #     main_type_second == "active" ~ "active"
+    #   , main_type_first %in% c("car", "active", "transit") &
+    #     main_type_second == "other" ~ "other"
+    #   , .default = NA_character_
+    # )
+  )
+  
 ```
 
 
 
 # Descriptive analysis
 
-
-## age histogram
-
-age histogram
 ```{r}
-df_both %>% filter(wave=="First") %>% ggplot(aes(x=age_corrected))+geom_histogram(binwidth = 1)+scale_x_continuous(breaks = seq(50,100,5))
+datasummary_balance(
+  data = df_tc %>% 
+    filter(wave=="First") %>% 
+    mutate(treatment = as_factor(treatment)) %>% 
+    select(wave,treatment,gender,age_groups_5_all,immigrant,visible_minority
+          , educ_has_postsec
+          , any_mobility_limitation
+          , employment
+          , income_groups
+          , in_lim
+           )
+  , ~ treatment
+  , 
+)
 ```
+
+
+```{r}
+DataExplorer::plot_bar(
+  data = df_tc %>% 
+    filter(wave=="First") %>% 
+    mutate(treatment=as.factor(treatment)) %>% 
+    select(wave,treatment,gender,age_groups_5_all)
+  , by = "treatment", by_position = "dodge"
+)
+```
+
+
 
 
 # fisher exact test
 
+## continuous variable (detla trips)
+
+```{r}
+simul_stat <- as.vector(NULL)
+set.seed(1001)
+
+df_fisher_continuous <- df_outcome_trips %>% 
+  select(treatment, delta_trips_wave)
+
+for(i in 1:557) {
+  print(i)
+  df_fisher_continuous$rand <- runif(557,min=-159,max=178)
+  df_fisher_continuous$treatment_rand <- as.numeric(rank(df_fisher_continuous$rand)<=480)
+  df_fisher_continuous$control_rand = 1-df_fisher_continuous$treatment_rand
+  simul_stat <- append(simul_stat,
+                       sum(df_fisher_continuous$treatment_rand*df_fisher_continuous$delta_trips_wave)/sum(df_fisher_continuous$treatment_rand) 
+                       - sum(df_fisher_continuous$control_rand*df_fisher_continuous$delta_trips_wave)/sum(df_fisher_continuous$control_rand))
+}
+
+df_fisher_continuous$control = 1-df_fisher_continuous$treatment
+actual_stat <- sum(df_fisher_continuous$treatment*df_fisher_continuous$delta_trips_wave)/sum(df_fisher_continuous$treatment) - 
+  sum(df_fisher_continuous$control*df_fisher_continuous$delta_trips_wave)/sum(df_fisher_continuous$control)
+actual_stat
+sum(abs(simul_stat) >= actual_stat)/NROW(simul_stat)
+
+
+#Printing the ATE
+ate <- actual_stat
+ate
+
+control_mean <- sum(df_fisher_continuous$control*df_fisher_continuous$delta_trips_wave)/sum(df_fisher_continuous$control)
+treatment_mean <- sum(df_fisher_continuous$treatment*df_fisher_continuous$delta_trips_wave)/sum(df_fisher_continuous$treatment)
+
+
+# average variance in control
+s_c <- (1/(sum(df_fisher_continuous$control)-1))*sum(((df_fisher_continuous$delta_trips_wave-control_mean)*df_fisher_continuous$control)^2)
+s_c
+# average variance in treatment
+s_t <- (1/(sum(df_fisher_continuous$treatment)-1))*sum(((df_fisher_continuous$delta_trips_wave-treatment_mean)*df_fisher_continuous$treatment)^2)
+s_t
+
+Vneyman <- (s_c/sum(df_fisher_continuous$control) + s_t/sum(df_fisher_continuous$treatment))
+print(sqrt(Vneyman))
+
+# t_value
+print(actual_stat/sqrt(Vneyman))
+
+# lower limit
+print(actual_stat-1.96*sqrt(Vneyman))
+# higher limit
+print(actual_stat+1.96*sqrt(Vneyman))
+
+```
+
+
+
+
 ## q101 (cost ever prevented using transit)
 
 ```{r}
-# two options
-df_q101 <- df_both %>% filter(wave=="Second" & q101!="Prefer not to answer")
-
-stats::fisher.test(table(df_q101$treatment_control_4, df_q101$q101))
-
-# or
-df <- data.frame(
-  "q101_no" = c(71, 353)
-  ,"q101_yes" = c(6, 122)
-  ,row.names = c("control", "treatment") 
-  , stringsAsFactors = F
+# cost prevented transit
+rstatix::pairwise_fisher_test(
+  xtab = table(
+    df_outcome_cost$treatment
+    ,df_outcome_cost$delta_cost_prevented_transit
+    )
+  , p.adjust.method = "fdr"
 )
-stats::fisher.test(df)
+
+rstatix::row_wise_fisher_test(
+  xtab = table(
+    df_outcome_cost$treatment
+    ,df_outcome_cost$delta_cost_prevented_transit
+    ) %>% t()
+  , p.adjust.method = "fdr"
+)
+
+rstatix::pairwise_fisher_test(
+  xtab = table(
+    df_outcome_cost$treatment
+    ,df_outcome_cost$delta_rides_enough_transit
+    )
+  , p.adjust.method = "fdr"
+)
 
 ```
+
+
+<!-- ```{r} -->
+<!-- # two options -->
+<!-- df_q101 <- df_both %>% filter(wave=="Second" & q101!="Prefer not to answer") -->
+
+<!-- stats::fisher.test(table(df_q101$treatment_control_4, df_q101$q101)) -->
+
+<!-- # or -->
+<!-- df <- data.frame( -->
+<!--   "q101_no" = c(71, 353) -->
+<!--   ,"q101_yes" = c(6, 122) -->
+<!--   ,row.names = c("control", "treatment")  -->
+<!--   , stringsAsFactors = F -->
+<!-- ) -->
+<!-- stats::fisher.test(df) -->
+
+<!-- ``` -->
 
 
 ## diff trips per wave
