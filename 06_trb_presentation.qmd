@@ -90,6 +90,7 @@ library(sysfonts)
 library(hrbrthemes)
 library(flextable)
 library(rstatix)
+library(openxlsx)
 # library(Z.gtsummary.addons)
 
 `%nin%` = Negate(`%in%`)
@@ -136,6 +137,35 @@ load(file = "data/list_count_trips_wave.RData")
 # keep only respondents who answered both waves
 df_attrition <- df_full %>% 
   filter(response_rate=="Started wave 2")
+
+df_attrition <- df_attrition %>% 
+  mutate(
+    income_groups2 = case_when(
+     income_groups %in% c(
+       "$120,000 to $149,999"
+       , "$150,000 to $179,999"
+       , "$180,000 to $209,999"
+       , "$210,000 or more"
+     ) ~ "$120,000 or more"
+      , .default = income_groups 
+     )
+  )
+
+df_attrition <- df_attrition %>% 
+  mutate(
+    income_groups2 = factor(
+      x = income_groups2
+      , levels = c(
+        "Less than $15,000"
+        , "$15,000 to $29,999"
+        , "$30,000 to $59,999"
+        , "$60,000 to $89,999"
+        , "$90,000 to $119,999"
+        , "$120,000 or more"
+      )
+      , ordered = T
+    )
+  )
 ```
 
 
@@ -449,6 +479,26 @@ df_outcome_participation <- df_outcome_participation %>%
 ### change in relationship to cost
 
 ```{r}
+df_tc <- df_tc %>% 
+  mutate(
+  difficulty_transport_expenses = factor(
+    difficulty_transport_expenses
+    , levels = c("No", "Neither", "Yes")
+    , ordered = T
+  )
+  , q103 = factor(
+    q103
+    , levels = c(
+      "Extremely difficult"
+      , "Somewhat difficult"
+      , "Neither easy nor difficult"
+      , "Somewhat easy"
+      , "Extremely easy"
+    )
+    , ordered = T
+  )
+)
+
 df_outcome_cost <- df_tc %>% 
   select(
     response_id,wave,treatment
@@ -460,11 +510,15 @@ df_outcome_cost <- df_tc %>%
 # derived from q25: What prevents you from using transit as much as you would like
 # if answer is i) nor worth the cost; or ii) i can't afford it
     , transit_barrier_cost_related
+# q103 In the last 12 months, how easy or difficult has it been for you to meet your transportation expenses?
+    , q103
+    , difficulty_transport_expenses
     ) %>% 
   pivot_wider(
     id_cols = c("response_id","treatment")
     , names_from = wave
-    , values_from = c(q100, q101, transit_barrier_cost_related)
+    , values_from = c(q100, q101, transit_barrier_cost_related
+                      , q103, difficulty_transport_expenses)
     # , names_prefix = "satisfaction_participation_"
   ) %>% 
   janitor::clean_names()
@@ -499,6 +553,38 @@ df_outcome_cost <- df_outcome_cost %>%
         transit_barrier_cost_related_second == "Yes" ~ 1L
       , transit_barrier_cost_related_first == "Yes" &
         transit_barrier_cost_related_second == "No" ~ -1L
+      , .default = NA_integer_
+    )
+    # , delta_difficult_bin = case_when(
+    #   difficulty_transport_expenses_first == 
+    #     difficulty_transport_expenses_second ~ 0L
+    #   , difficulty_transport_expenses_first < 
+    #     difficulty_transport_expenses_second ~ 1L
+    #   , difficulty_transport_expenses_first >
+    #     difficulty_transport_expenses_second ~ -1L
+    #   , .default = NA_integer_
+    # )
+    # , delta_difficult_bin2 = case_when(
+    #   difficulty_transport_expenses_first == 
+    #     difficulty_transport_expenses_second ~ 0L
+    #   
+    #   , difficulty_transport_expenses_first == "No" &
+    #     difficulty_transport_expenses_second %in% c("Neither","Yes") ~ 1L
+    #   
+    #   , difficulty_transport_expenses_first == "Neither" &
+    #     difficulty_transport_expenses_second == "Yes" ~ 1L
+    #   
+    #   , difficulty_transport_expenses_first == "Yes" &
+    #     difficulty_transport_expenses_second %in% c("Neither", "No") ~ -1L
+    #   
+    #   , difficulty_transport_expenses_first == "Neither" &
+    #     difficulty_transport_expenses_second == "No" ~ -1L
+    #   , .default = NA_integer_
+    # )
+    , delta_difficult_broad = case_when(
+      q103_first == q103_second ~ 0L
+      , q103_first < q103_second ~ 1L
+      , q103_first > q103_second ~ -1L
       , .default = NA_integer_
     )
   )
@@ -626,35 +712,201 @@ df_outcome_main <- df_outcome_main %>%
 
 # Descriptive analysis
 
-```{r}
-datasummary_balance(
-  data = df_tc %>% 
-    filter(wave=="First") %>% 
-    mutate(treatment = as_factor(treatment)) %>% 
-    select(wave,treatment,gender,age_groups_5_all,immigrant,visible_minority
-          , educ_has_postsec
-          , any_mobility_limitation
-          , employment
-          , income_groups
-          , in_lim
-           )
-  , ~ treatment
-  , 
-)
-```
-
+## constant demographics
 
 ```{r}
-DataExplorer::plot_bar(
-  data = df_tc %>% 
-    filter(wave=="First") %>% 
-    mutate(treatment=as.factor(treatment)) %>% 
-    select(wave,treatment,gender,age_groups_5_all)
-  , by = "treatment", by_position = "dodge"
-)
+# treatment
+desc_age <- df_tc %>% 
+  dplyr::filter(wave == "First") %>% 
+  mutate(treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)) %>% 
+  select(
+    # wave
+    treatment
+    , age_groups_5_all
+  # , visible_minority
+  # , immigrant
+  # , gender
+  # , educ_has_postsec
+) %>% 
+  mutate(
+    age_groups_5_all = forcats::fct_drop(
+      age_groups_5_all
+      , only = c("age_50_54","age_55_59", "age_60_64")
+      )
+    , age_groups_5_all = forcats::fct_recode(
+      age_groups_5_all
+      , `Age 65-69` = "age_65_69"
+      , `Age 70-74` = "age_70_74"
+      , `Age 75-79` = "age_75_79"
+      , `Age 80-84` = "age_80_84"
+      , `Age 85-89` = "age_85_89"
+      , `Age 90 and over` = "age_90_over"
+    )
+  ) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+  rename(
+    # "Visible minority" = visible_minority
+    # , "Is Immigrant" = immigrant
+    # , "Gender" = gender
+    # , "Has post-secondary education" = educ_has_postsec
+    , "Treatment" = treatment
+    , "Age groups (5 years intervals)" = age_groups_5_all
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          # `Treatment` ~ "frequency"
+           `Age groups (5 years intervals)` ~ "alphanumeric"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = `Treatment`
+        , statistic = all_categorical() ~ "{p}%"
+      ) %>% 
+        gtsummary::add_overall(last = T, 
+                             # col_label = "Total, N = {N}"
+                             ) %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>% 
+  # gtsummary::modify_header() %>% 
+  gtsummary::as_tibble()
+
+
+
+openxlsx::write.xlsx(desc_age, "output/df_age.xlsx")
 ```
 
+```{r}
+desc_constant <- df_tc %>% 
+  dplyr::filter(wave == "First") %>% 
+  mutate(treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)) %>% 
+  select(
+    # wave
+    treatment
+  , visible_minority
+  , immigrant
+  , gender
+  , educ_has_postsec
+) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+  rename(
+    "Visible minority" = visible_minority
+    , "Is Immigrant" = immigrant
+    , "Gender" = gender
+    , "Has post-secondary education" = educ_has_postsec
+    , "Treatment" = treatment
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          `Visible minority` ~ "frequency"
+          , `Is Immigrant` ~ "frequency"
+          , `Gender` ~ "frequency"
+          , `Has post-secondary education` ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = `Treatment`
+        , statistic = all_categorical() ~ "{p}%"
+      ) %>% 
+      gtsummary::add_overall(last = T, 
+                             # col_label = "Total, N = {N}"
+                             ) %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>% 
+  # gtsummary::modify_header() %>% 
+  gtsummary::as_tibble()
 
+
+
+openxlsx::write.xlsx(desc_constant, "output/df_constant_demographics.xlsx")
+```
+
+## time-variant demographics
+
+```{r}
+desc_variant <- df_tc %>% 
+  dplyr::filter(wave == "First") %>% 
+  mutate(treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)) %>% 
+  select(
+    # wave
+    treatment
+    , any_mobility_limitation
+    # , any_functional_limitation
+    , employment
+    , income_groups2
+    , in_lim
+    , has_vehicle_household
+) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+  rename(
+    "Any mobility limitation" = any_mobility_limitation
+    # , "Any functional limitation" = any_functional_limitation
+    , "Employment" = employment
+    , "Annual income groups" = income_groups2
+    , "Household below LIM" = in_lim
+    , "Has Vehicle in Household" = has_vehicle_household
+    , "Treatment" = treatment
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          `Any mobility limitation` ~ "frequency"
+          , `Employment` ~ "frequency"
+          , `Annual income groups` ~ "frequency"
+          , `Household below LIM` ~ "frequency"
+          , `Has Vehicle in Household` ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = `Treatment`
+        , statistic = all_categorical() ~ "{p}%"
+      ) %>% 
+      gtsummary::add_overall(last = T, 
+                             # col_label = "Total, N = {N}"
+                             ) %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>% 
+  # gtsummary::modify_header() %>% 
+  gtsummary::as_tibble()
+
+
+
+openxlsx::write.xlsx(desc_variant, "output/df_variant_demographics.xlsx")
+```
 
 
 # fisher exact test
@@ -771,7 +1023,6 @@ rstatix::pairwise_fisher_test(
 
 df_diff_trips_wave <- df_both %>% 
   filter(wave=="Second")
-
 
 
 stats::fisher.test(table(
