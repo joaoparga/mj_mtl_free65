@@ -91,6 +91,8 @@ library(hrbrthemes)
 library(flextable)
 library(rstatix)
 library(openxlsx)
+library(MASS)
+library(rcompanion)
 # library(Z.gtsummary.addons)
 
 `%nin%` = Negate(`%in%`)
@@ -218,6 +220,7 @@ df_second <- df_attrition %>%
     , age_groups_binary == "65+" & has_free_pass_wave2 == "Yes" ~ 1L
     , .default = NA_integer_
   )
+  # other treat
   )
 
 df_first <- df_attrition %>% 
@@ -304,7 +307,44 @@ df_tc <- df_tc %>%
 
 ### change in satisfaction activity
 
+Transform variables into ordered factors
+
 ```{r}
+df_tc <- df_tc %>% 
+  mutate(
+    satisfaction_activity_participation = factor(
+      x = satisfaction_activity_participation
+      , levels = c("Dissatisfied","Neither","Satisfied")
+      , ordered = T
+    )
+  )
+
+df_tc <- df_tc %>% 
+  mutate(
+    q109_3 = factor(
+      x = q109_3
+      , levels = c("Strongly Disagree","Disagree","Neither agree nor disagree"
+          , "Agree","Strongly Agree")
+      , ordered = T
+    )
+    , q109_4 = factor(
+      x = q109_3
+      , levels = c("Strongly Disagree","Disagree","Neither agree nor disagree"
+          , "Agree","Strongly Agree")
+      , ordered = T
+    )
+    , q109_5 = factor(
+      x = q109_3
+      , levels = c("Strongly Disagree","Disagree","Neither agree nor disagree"
+          , "Agree","Strongly Agree")
+      , ordered = T
+    )
+  )
+```
+
+
+```{r}
+
 df_outcome_participation <- df_tc %>% 
   select(
     response_id,wave,treatment,
@@ -321,157 +361,216 @@ df_outcome_participation <- df_tc %>%
 
 df_outcome_participation <- df_outcome_participation %>% 
   mutate(
-    delta_satisfaction_activity_lvls = case_when(
-      satisfaction_activity_participation_first == "Dissatisfied" &
-        satisfaction_activity_participation_second == "Neither" ~ 1L
-      , satisfaction_activity_participation_first == "Neither" &
-        satisfaction_activity_participation_second == "Satisfied" ~ 1L
-      , satisfaction_activity_participation_first == "Dissatisfied" &
-        satisfaction_activity_participation_second == "Satisfied" ~ 2L
-      , satisfaction_activity_participation_first == 
-        satisfaction_activity_participation_second ~ 0L
-      , satisfaction_activity_participation_first == "Satisfied" & 
-        satisfaction_activity_participation_second == "Neither" ~ -1L
-      , satisfaction_activity_participation_first == "Neither" & 
-        satisfaction_activity_participation_second == "Dissatisfied" ~ -1L
-      , satisfaction_activity_participation_first == "Satisfied" & 
-        satisfaction_activity_participation_second == "Dissatisfied" ~ -2L
-      , .default = NA_integer_
+    delta_satisfaction_activity = case_when(
+      satisfaction_activity_participation_first <
+        satisfaction_activity_participation_second ~ "Worse satisfaction"
+      , satisfaction_activity_participation_first ==
+        satisfaction_activity_participation_second ~ "Same satisfaction"
+      , satisfaction_activity_participation_first >
+        satisfaction_activity_participation_second ~ "Better satisfaction"
+      , .default = NA_character_
     )
-    , delta_satisfaction_activity_bin = case_when(
-      delta_satisfaction_activity_lvls < 0L ~ -1L
-      , delta_satisfaction_activity_lvls == 0L ~ 0L
-      , delta_satisfaction_activity_lvls > 0L ~ 1L
-      , .default = NA_integer_
+    , delta_satisfaction_friends_family = case_when(
+      q109_3_first <
+        q109_3_second ~ "Worse satisfaction"
+      , q109_3_first ==
+        q109_3_second ~ "Same satisfaction"
+      , q109_3_first >
+        q109_3_second ~ "Better satisfaction"
+      , .default = NA_character_
     )
-    ,   delta_satisfaction_activity_bin2 = case_when(
-      satisfaction_activity_participation_first %in% c("Dissatisfied", "Neither") &
-        satisfaction_activity_participation_second == "Satisfied" ~ 1L
-      , satisfaction_activity_participation_first == satisfaction_activity_participation_second ~ 0L
-      , satisfaction_activity_participation_first %in% c("Neither","Satisfied") & 
-        satisfaction_activity_participation_second == "Dissatisfied" ~ -1L
-      , satisfaction_activity_participation_first == "Dissatisfied" &
-        satisfaction_activity_participation_second == "Neither" ~ 0L
-      , satisfaction_activity_participation_first == "Satisfied" &
-        satisfaction_activity_participation_second == "Neither" ~ 0L
-      , .default = NA_integer_
+    , delta_satisfaction_recreation = case_when(
+      q109_4_first <
+        q109_4_second ~ "Worse satisfaction"
+      , q109_4_first ==
+        q109_4_second ~ "Same satisfaction"
+      , q109_4_first >
+        q109_4_second ~ "Better satisfaction"
+      , .default = NA_character_
     )
-  , delta_satisfaction_friends_family = case_when(
-    q109_3_first == "Strongly Disagree" &
-      q109_3_second %in% c(
-        "Disagree"
-        ,"Neither agree nor disagree"
-        ,"Agree"
-        , "Strongly Agree") ~ 1L
-    , q109_3_first == "Disagree" &
-      q109_3_second %in% c(
-        "Neither agree nor disagree"
-        ,"Agree"
-        , "Strongly Agree") ~ 1L
-    , q109_3_first == "Neither agree nor disagree" &
-      q109_3_second %in% c(
-        "Agree"
-        , "Strongly Agree") ~ 1L
-    , q109_3_first == "Agree" &
-      q109_3_second %in% c("Strongly Agree") ~ 1L
-    , q109_3_first == q109_3_second ~ 0L
-    , q109_3_first == "Strongly Agree" &
-      q109_3_second %in% c(
-        "Strongly Disagree"
-        , "Disagree"
-        ,"Neither agree nor disagree"
-        , "Agree") ~ -1L
-    , q109_3_first == "Agree" &
-      q109_3_second %in% c(
-        "Strongly Disagree"
-        , "Disagree"
-        ,"Neither agree nor disagree") ~ -1L
-    , q109_3_first == "Neither agree nor disagree" &
-      q109_3_second %in% c(
-        "Strongly Disagree"
-        , "Disagree") ~ -1L
-    , q109_3_first == "Disagree" &
-      q109_3_second %in% c("Strongly Disagree") ~ -1L
-    , .default = NA_integer_
+    , delta_satisfaction_attend_events = case_when(
+      q109_5_first <
+        q109_5_second ~ "Worse satisfaction"
+      , q109_5_first ==
+        q109_5_second ~ "Same satisfaction"
+      , q109_5_first >
+        q109_5_second ~ "Better satisfaction"
+      , .default = NA_character_
     )
-  , delta_satisfaction_recreation = case_when(
-  q109_4_first == "Strongly Disagree" &
-    q109_4_second %in% c(
-      "Disagree"
-      ,"Neither agree nor disagree"
-      ,"Agree"
-      , "Strongly Agree") ~ 1L
-  , q109_4_first == "Disagree" &
-    q109_4_second %in% c(
-      "Neither agree nor disagree"
-      ,"Agree"
-      , "Strongly Agree") ~ 1L
-  , q109_4_first == "Neither agree nor disagree" &
-    q109_4_second %in% c(
-      "Agree"
-      , "Strongly Agree") ~ 1L
-  , q109_4_first == "Agree" &
-    q109_4_second %in% c("Strongly Agree") ~ 1L
-  , q109_4_first == q109_4_second ~ 0L
-  , q109_4_first == "Strongly Agree" &
-    q109_4_second %in% c(
-      "Strongly Disagree"
-      , "Disagree"
-      ,"Neither agree nor disagree"
-      , "Agree") ~ -1L
-  , q109_4_first == "Agree" &
-    q109_4_second %in% c(
-      "Strongly Disagree"
-      , "Disagree"
-      ,"Neither agree nor disagree") ~ -1L
-  , q109_4_first == "Neither agree nor disagree" &
-    q109_4_second %in% c(
-      "Strongly Disagree"
-      , "Disagree") ~ -1L
-  , q109_4_first == "Disagree" &
-    q109_4_second %in% c("Strongly Disagree") ~ -1L
-  , .default = NA_integer_
-  )
-  , delta_satisfaction_attend_events = case_when(
-  q109_5_first == "Strongly Disagree" &
-    q109_5_second %in% c(
-      "Disagree"
-      ,"Neither agree nor disagree"
-      ,"Agree"
-      , "Strongly Agree") ~ 1L
-  , q109_5_first == "Disagree" &
-    q109_5_second %in% c(
-      "Neither agree nor disagree"
-      ,"Agree"
-      , "Strongly Agree") ~ 1L
-  , q109_5_first == "Neither agree nor disagree" &
-    q109_5_second %in% c(
-      "Agree"
-      , "Strongly Agree") ~ 1L
-  , q109_5_first == "Agree" &
-    q109_5_second %in% c("Strongly Agree") ~ 1L
-  , q109_5_first == q109_5_second ~ 0L
-  , q109_5_first == "Strongly Agree" &
-    q109_5_second %in% c(
-      "Strongly Disagree"
-      , "Disagree"
-      ,"Neither agree nor disagree"
-      , "Agree") ~ -1L
-  , q109_5_first == "Agree" &
-    q109_5_second %in% c(
-      "Strongly Disagree"
-      , "Disagree"
-      ,"Neither agree nor disagree") ~ -1L
-  , q109_5_first == "Neither agree nor disagree" &
-    q109_5_second %in% c(
-      "Strongly Disagree"
-      , "Disagree") ~ -1L
-  , q109_5_first == "Disagree" &
-    q109_5_second %in% c("Strongly Disagree") ~ -1L
-  , .default = NA_integer_
-)
   )
 
+df_outcome_participation <- df_outcome_participation %>% 
+  mutate(
+    across(
+      .cols = dplyr::matches("delta")
+      , ~factor(
+        x = .x
+        , levels = c("Worse satisfaction", "Same satisfaction"
+                     , "Better satisfaction")
+        , ordered = T
+        )
+    )
+  )
+
+# df_outcome_participation <- df_outcome_participation %>% 
+#   mutate(
+    # delta_satisfaction_activity_lvls = case_when(
+    #   satisfaction_activity_participation_first == "Dissatisfied" &
+    #     satisfaction_activity_participation_second == "Neither" ~ 1L
+    #   , satisfaction_activity_participation_first == "Neither" &
+    #     satisfaction_activity_participation_second == "Satisfied" ~ 1L
+    #   , satisfaction_activity_participation_first == "Dissatisfied" &
+    #     satisfaction_activity_participation_second == "Satisfied" ~ 2L
+    #   , satisfaction_activity_participation_first == 
+    #     satisfaction_activity_participation_second ~ 0L
+    #   , satisfaction_activity_participation_first == "Satisfied" & 
+    #     satisfaction_activity_participation_second == "Neither" ~ -1L
+    #   , satisfaction_activity_participation_first == "Neither" & 
+    #     satisfaction_activity_participation_second == "Dissatisfied" ~ -1L
+    #   , satisfaction_activity_participation_first == "Satisfied" & 
+    #     satisfaction_activity_participation_second == "Dissatisfied" ~ -2L
+    #   , .default = NA_integer_
+    # )
+    
+    # , delta_satisfaction_activity_bin = case_when(
+    #     delta_satisfaction_activity_lvls < 0L ~ "Worse satisfaction" #-1L
+    #     , delta_satisfaction_activity_lvls == 0L ~ "Same satisfaction" # 0L
+    #     , delta_satisfaction_activity_lvls > 0L ~ "Better satisfaction" # 1L
+    #     , .default = NA_character_
+    #   )
+    
+    # ,delta_satisfaction_activity_bin2 = case_when(
+    # satisfaction_activity_participation_first %in% c("Dissatisfied", "Neither") &
+    #     satisfaction_activity_participation_second == "Satisfied" ~ 1L
+    #   , satisfaction_activity_participation_first == satisfaction_activity_participation_second ~ 0L
+    # 
+    #   , satisfaction_activity_participation_first %in% c("Neither","Satisfied") & 
+    #     satisfaction_activity_participation_second == "Dissatisfied" ~ -1L
+    # 
+    #   , satisfaction_activity_participation_first == "Dissatisfied" &
+    #     satisfaction_activity_participation_second == "Neither" ~ 0L
+    # 
+    #   , satisfaction_activity_participation_first == "Satisfied" &
+    #     satisfaction_activity_participation_second == "Neither" ~ 0L
+    # 
+    #   , .default = NA_integer_
+    # )
+    
+#   , delta_satisfaction_friends_family = case_when(
+#     q109_3_first == "Strongly Disagree" &
+#       q109_3_second %in% c(
+#         "Disagree"
+#         ,"Neither agree nor disagree"
+#         ,"Agree"
+#         , "Strongly Agree") ~ 1L
+#     , q109_3_first == "Disagree" &
+#       q109_3_second %in% c(
+#         "Neither agree nor disagree"
+#         ,"Agree"
+#         , "Strongly Agree") ~ 1L
+#     , q109_3_first == "Neither agree nor disagree" &
+#       q109_3_second %in% c(
+#         "Agree"
+#         , "Strongly Agree") ~ 1L
+#     , q109_3_first == "Agree" &
+#       q109_3_second %in% c("Strongly Agree") ~ 1L
+#     , q109_3_first == q109_3_second ~ 0L
+#     , q109_3_first == "Strongly Agree" &
+#       q109_3_second %in% c(
+#         "Strongly Disagree"
+#         , "Disagree"
+#         ,"Neither agree nor disagree"
+#         , "Agree") ~ -1L
+#     , q109_3_first == "Agree" &
+#       q109_3_second %in% c(
+#         "Strongly Disagree"
+#         , "Disagree"
+#         ,"Neither agree nor disagree") ~ -1L
+#     , q109_3_first == "Neither agree nor disagree" &
+#       q109_3_second %in% c(
+#         "Strongly Disagree"
+#         , "Disagree") ~ -1L
+#     , q109_3_first == "Disagree" &
+#       q109_3_second %in% c("Strongly Disagree") ~ -1L
+#     , .default = NA_integer_
+#     )
+#   , delta_satisfaction_recreation = case_when(
+#   q109_4_first == "Strongly Disagree" &
+#     q109_4_second %in% c(
+#       "Disagree"
+#       ,"Neither agree nor disagree"
+#       ,"Agree"
+#       , "Strongly Agree") ~ 1L
+#   , q109_4_first == "Disagree" &
+#     q109_4_second %in% c(
+#       "Neither agree nor disagree"
+#       ,"Agree"
+#       , "Strongly Agree") ~ 1L
+#   , q109_4_first == "Neither agree nor disagree" &
+#     q109_4_second %in% c(
+#       "Agree"
+#       , "Strongly Agree") ~ 1L
+#   , q109_4_first == "Agree" &
+#     q109_4_second %in% c("Strongly Agree") ~ 1L
+#   , q109_4_first == q109_4_second ~ 0L
+#   , q109_4_first == "Strongly Agree" &
+#     q109_4_second %in% c(
+#       "Strongly Disagree"
+#       , "Disagree"
+#       ,"Neither agree nor disagree"
+#       , "Agree") ~ -1L
+#   , q109_4_first == "Agree" &
+#     q109_4_second %in% c(
+#       "Strongly Disagree"
+#       , "Disagree"
+#       ,"Neither agree nor disagree") ~ -1L
+#   , q109_4_first == "Neither agree nor disagree" &
+#     q109_4_second %in% c(
+#       "Strongly Disagree"
+#       , "Disagree") ~ -1L
+#   , q109_4_first == "Disagree" &
+#     q109_4_second %in% c("Strongly Disagree") ~ -1L
+#   , .default = NA_integer_
+#   )
+#   , delta_satisfaction_attend_events = case_when(
+#   q109_5_first == "Strongly Disagree" &
+#     q109_5_second %in% c(
+#       "Disagree"
+#       ,"Neither agree nor disagree"
+#       ,"Agree"
+#       , "Strongly Agree") ~ 1L
+#   , q109_5_first == "Disagree" &
+#     q109_5_second %in% c(
+#       "Neither agree nor disagree"
+#       ,"Agree"
+#       , "Strongly Agree") ~ 1L
+#   , q109_5_first == "Neither agree nor disagree" &
+#     q109_5_second %in% c(
+#       "Agree"
+#       , "Strongly Agree") ~ 1L
+#   , q109_5_first == "Agree" &
+#     q109_5_second %in% c("Strongly Agree") ~ 1L
+#   , q109_5_first == q109_5_second ~ 0L
+#   , q109_5_first == "Strongly Agree" &
+#     q109_5_second %in% c(
+#       "Strongly Disagree"
+#       , "Disagree"
+#       ,"Neither agree nor disagree"
+#       , "Agree") ~ -1L
+#   , q109_5_first == "Agree" &
+#     q109_5_second %in% c(
+#       "Strongly Disagree"
+#       , "Disagree"
+#       ,"Neither agree nor disagree") ~ -1L
+#   , q109_5_first == "Neither agree nor disagree" &
+#     q109_5_second %in% c(
+#       "Strongly Disagree"
+#       , "Disagree") ~ -1L
+#   , q109_5_first == "Disagree" &
+#     q109_5_second %in% c("Strongly Disagree") ~ -1L
+#   , .default = NA_integer_
+# )
+#   )
 
 
 ```
@@ -489,11 +588,11 @@ df_tc <- df_tc %>%
   , q103 = factor(
     q103
     , levels = c(
-      "Extremely difficult"
-      , "Somewhat difficult"
-      , "Neither easy nor difficult"
+      "Extremely easy"
       , "Somewhat easy"
-      , "Extremely easy"
+      , "Neither easy nor difficult"
+      , "Somewhat difficult"
+      ,"Extremely difficult"
     )
     , ordered = T
   )
@@ -526,34 +625,46 @@ df_outcome_cost <- df_tc %>%
 df_outcome_cost <- df_outcome_cost %>% 
   mutate(
     delta_rides_enough_transit = case_when(
-      q100_first == q100_second ~ 0L
+      q100_first == q100_second ~ "Same"
+        # "Same perception" # "Rides same two periods" #0L
       
       , q100_first == "No" &
-        q100_second == "Yes" ~ 1L
+        q100_second == "Yes" ~ "Better"
+        # "Improved perception" # "Rides more second period" # 1L
       
       , q100_first == "Yes" &
-        q100_second == "No" ~ -1L
+        q100_second == "No" ~ "Worse"
+        # "Worsened perception" #"Rides less second period" # -1L
       
-      , .default = NA_integer_
+      , .default = NA_character_
     )
     , delta_cost_prevented_transit = case_when(
-      q101_first == q101_second ~ 0L
+      q101_first == q101_second ~ "samet0t1"
+        # "Same" #0L
       
       , q101_first == "No" &
-        q101_second == "Yes" ~ 1L
+        q101_second == "Yes" ~ "t0no_t1yes"
+        # "Better" #1L
       
       , q101_first == "Yes" &
-        q101_second == "No" ~ -1L
+        q101_second == "No" ~ "t0yes_t1no"
+        # "Worse" #-1L
       
-      , .default = NA_integer_
+      , .default = NA_character_
     )
     , delta_transit_barrier_cost = case_when(
-      transit_barrier_cost_related_first == transit_barrier_cost_related_second ~ 0L
+      transit_barrier_cost_related_first == 
+        transit_barrier_cost_related_second ~ "samet0t1"
+        # 0L
       , transit_barrier_cost_related_first == "No" &
-        transit_barrier_cost_related_second == "Yes" ~ 1L
+        transit_barrier_cost_related_second == "Yes" ~ "t0no_t1yes"
+        # "Better"
+        # 1L
       , transit_barrier_cost_related_first == "Yes" &
-        transit_barrier_cost_related_second == "No" ~ -1L
-      , .default = NA_integer_
+        transit_barrier_cost_related_second == "No" ~ "t0yes_t1no"
+        # "Worse"
+        # -1L
+      , .default = NA_character_
     )
     # , delta_difficult_bin = case_when(
     #   difficulty_transport_expenses_first == 
@@ -582,16 +693,54 @@ df_outcome_cost <- df_outcome_cost %>%
     #   , .default = NA_integer_
     # )
     , delta_difficult_broad = case_when(
-      q103_first == q103_second ~ 0L
-      , q103_first < q103_second ~ 1L
-      , q103_first > q103_second ~ -1L
-      , .default = NA_integer_
+# 5 Levels: Extremely easy < Somewhat easy < Neither easy nor difficult < ... < Extremely difficult
+      q103_first == q103_second ~ "Same"
+        # 0L
+      , q103_first > q103_second ~ "Easier"
+      # -1L
+      , q103_first < q103_second ~ "Harder"
+      # 1L
+      , .default = NA_character_
+    )
+  )
+
+
+df_outcome_cost <- df_outcome_cost %>% 
+  mutate(
+    delta_rides_enough_transit = factor(
+      x = delta_rides_enough_transit
+      , levels = c("Worse", "Same"
+                     , "Better")
+      , ordered = T
+    )
+    , across(
+      .cols = c(
+        , "delta_cost_prevented_transit"
+        , "delta_transit_barrier_cost"
+      )
+      , ~factor(
+        x = .x
+        , levels = c("t0yes_t1no", "samet0t1"
+                     , "t0no_t1yes")
+        , ordered = T
+        )
+    )
+  )
+
+df_outcome_cost <- df_outcome_cost %>% 
+  mutate(
+    delta_difficult_broad = factor(
+      x = delta_difficult_broad
+      , levels = c("Easier","Same","Harder")
+      , ordered = T
     )
   )
   
 ```
 
 ### count trips wave
+
+NEXT STEPS: UNDERTSAND OUTLIERS IN TRIP GENERATION
 
 ```{r}
 df_outcome_trips <- df_tc %>% 
@@ -655,12 +804,15 @@ df_outcome_main <- df_tc %>%
 df_outcome_main <- df_outcome_main %>% 
   mutate(
     delta_type = case_when(
-      main_type_first == main_type_second ~ 0L
+      main_type_first == main_type_second ~ "Same main mode"
+        # 0L
       , main_type_first == "transit" &
-        main_type_second %nin% c("transit") ~ -1L
+        main_type_second %nin% c("transit") ~ "Transit no longer main"
+        # -1L
       , main_type_first %nin% c("transit") &
-        main_type_second %in% c("transit") ~ 1L
-      , .default = NA_integer_
+        main_type_second %in% c("transit") ~ "Transit now main"
+        # 1L
+      , .default = NA_character_
     )
     , new_type = case_when(
       main_type_first == main_type_second ~ "same"
@@ -706,8 +858,44 @@ df_outcome_main <- df_outcome_main %>%
     # )
   )
   
+df_outcome_main <- df_outcome_main %>% 
+  mutate(
+    new_type = factor(
+      new_type
+      , levels = c("new_active","new_car","new_other","new_transit","same")
+    )
+    , delta_type = factor(
+      x = delta_type
+      , levels = c("Transit no longer main","Same main mode","Transit now main")
+      , ordered = T
+    )
+  )
+
 ```
 
+## join outcomes
+
+
+```{r}
+df_outcomes <- dplyr::left_join(
+  df_outcome_participation %>% 
+    select(response_id,treatment, dplyr::matches("delta"))
+  , df_outcome_cost %>% 
+    select(response_id,treatment, dplyr::matches("delta"))
+  , by = c("response_id", "treatment")
+) %>% 
+  dplyr::left_join(
+    df_outcome_trips %>% 
+    select(response_id,treatment, dplyr::matches("delta"))
+    , by = c("response_id", "treatment")
+  ) %>% 
+  dplyr::left_join(
+    df_outcome_main %>% 
+    select(response_id,treatment, dplyr::matches("delta"), new_type)
+    , by = c("response_id", "treatment")
+  )
+
+```
 
 
 # Descriptive analysis
@@ -908,10 +1096,67 @@ desc_variant <- df_tc %>%
 openxlsx::write.xlsx(desc_variant, "output/df_variant_demographics.xlsx")
 ```
 
+## descriptive dependent variables
+
+descriptive 
+
+
+<!-- ```{r} -->
+
+<!-- desc_outcomes <- df_outcomes %>%  -->
+<!--   dplyr::filter(wave == "First") %>%  -->
+<!--   mutate(treatment = factor( -->
+<!--     treatment -->
+<!--     , levels = c(0L,1L) -->
+<!--     , labels = c("Control", "Treatment") -->
+<!--     , ordered = T)) %>%  -->
+<!--   select() %>%  -->
+<!--     mutate( -->
+<!--     across( -->
+<!--       .cols = -one_of("treatment") -->
+<!--       # don't change fct below for newer one -->
+<!--       , ~ forcats::fct_explicit_na(.x) -->
+<!--       ) -->
+<!--   ) %>%  -->
+<!--   # rename( -->
+<!--   #   "Any mobility limitation" = any_mobility_limitation -->
+<!--   #   # , "Any functional limitation" = any_functional_limitation -->
+<!--   #   , "Employment" = employment -->
+<!--   #   , "Annual income groups" = income_groups2 -->
+<!--   #   , "Household below LIM" = in_lim -->
+<!--   #   , "Has Vehicle in Household" = has_vehicle_household -->
+<!--   #   , "Treatment" = treatment -->
+<!--   # ) %>%  -->
+<!--       gtsummary::tbl_summary( -->
+<!--         type = gtsummary::all_dichotomous() ~ "categorical" -->
+<!--         , sort = list( -->
+<!--           `Any mobility limitation` ~ "frequency" -->
+<!--           , `Employment` ~ "frequency" -->
+<!--           , `Annual income groups` ~ "frequency" -->
+<!--           , `Household below LIM` ~ "frequency" -->
+<!--           , `Has Vehicle in Household` ~ "frequency" -->
+<!--         ) -->
+<!--         # all_categorical() ~ "frequency" -->
+<!--         # , missing = "always" -->
+<!--         , missing_text = "Missing" -->
+<!--         , missing_stat = "{p_miss}%" -->
+<!--         , by = `Treatment` -->
+<!--         , statistic = all_categorical() ~ "{p}%" -->
+<!--       ) %>%  -->
+<!--       gtsummary::add_overall(last = T,  -->
+<!--                              # col_label = "Total, N = {N}" -->
+<!--                              ) %>% -->
+<!--       gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>%  -->
+<!--   # gtsummary::modify_header() %>%  -->
+<!--   gtsummary::as_tibble() -->
+
+<!-- ``` -->
+
+
 
 # fisher exact test
 
-## continuous variable (detla trips)
+## continuous variable (delta trips)
 
 ```{r}
 simul_stat <- as.vector(NULL)
@@ -968,32 +1213,95 @@ print(actual_stat+1.96*sqrt(Vneyman))
 
 
 
-## q101 (cost ever prevented using transit)
+## cost
 
 ```{r}
-# cost prevented transit
-rstatix::pairwise_fisher_test(
-  xtab = table(
-    df_outcome_cost$treatment
-    ,df_outcome_cost$delta_cost_prevented_transit
-    )
-  , p.adjust.method = "fdr"
-)
+# df_outcomes <- df_outcomes %>% 
+#   mutate(treatment = factor(
+#     treatment
+#     , levels = c(0L,1L)
+#     , labels = c("Control", "Treatment")
+#     , ordered = T
+#     )
+#     )
+```
 
-rstatix::row_wise_fisher_test(
-  xtab = table(
-    df_outcome_cost$treatment
-    ,df_outcome_cost$delta_cost_prevented_transit
-    ) %>% t()
-  , p.adjust.method = "fdr"
+riders enough transit: *NOT SIGNIFICANT*
+```{r}
+# fisher test (2x2)
+stats::fisher.test(
+  df_outcome_cost$treatment
+  , df_outcome_cost$delta_rides_enough_transit
 )
-
+# post-hoc test: assess if the differences between levels was significant
 rstatix::pairwise_fisher_test(
   xtab = table(
     df_outcome_cost$treatment
     ,df_outcome_cost$delta_rides_enough_transit
     )
-  , p.adjust.method = "fdr"
+  , p.adjust.method = "bonferroni"
+)
+
+```
+
+
+cost EVER prevented riding transit as would like? 
+2X2: *SIGNIFICANT*
+POST HOC: 
+  - t0: yes; t1: no -> *SIGNIFICANT*
+  - Same t0
+  
+```{r}
+# fisher test (2x2)
+stats::fisher.test(
+  df_outcome_cost$treatment
+  , df_outcome_cost$delta_cost_prevented_transit
+)
+# post-hoc test: assess if the differences between levels was significant
+rstatix::pairwise_fisher_test(
+  xtab = table(
+    df_outcome_cost$delta_cost_prevented_transit
+    , df_outcome_cost$treatment
+    )
+  , p.adjust.method = "bonferroni"
+)
+
+```
+
+
+cost as transit barrier
+```{r}
+# fisher test (2x2)
+stats::fisher.test(
+  df_outcome_cost$treatment
+  , df_outcome_cost$delta_transit_barrier_cost
+)
+# post-hoc test: assess if the differences between levels was significant
+rstatix::pairwise_fisher_test(
+  xtab = table(
+    df_outcome_cost$treatment
+    ,df_outcome_cost$delta_transit_barrier_cost
+    )
+  , p.adjust.method = "bonferroni"
+)
+
+```
+
+
+difficult meeting transport costs
+```{r}
+# fisher test (2x2)
+stats::fisher.test(
+  df_outcome_cost$treatment
+  , df_outcome_cost$delta_difficult_broad
+)
+# post-hoc test: assess if the differences between levels was significant
+rstatix::pairwise_fisher_test(
+  xtab = table(
+    df_outcome_cost$treatment
+    ,df_outcome_cost$delta_difficult_broad
+    )
+  , p.adjust.method = "bonferroni"
 )
 
 ```
@@ -1016,25 +1324,141 @@ rstatix::pairwise_fisher_test(
 
 <!-- ``` -->
 
+## activity participation
+
+INCOMPLETE
+
+```{r}
+chisq_test(
+  df_outcomes$treatment
+  , df_outcomes$delta_satisfaction_activity
+)
+
+```
+
 
 ## diff trips per wave
 
+INCOMPLETE
+
 ```{r}
 
-df_diff_trips_wave <- df_both %>% 
-  filter(wave=="Second")
+```
+
+## rcompanion
+
+https://rcompanion.org/rcompanion/b_07.html
+http://www.biostathandbook.com/fishers.html
+
+```{r}
+teste <- df_outcome_cost %>% 
+  mutate(
+    treatment = case_when(
+      treatment == 0L ~ "Control"
+      , treatment == 1L ~ "Treatment"
+      , .default = NA_character_
+    )
+    # , delta_cost_prevented_transit = case_when(
+    #   delta_cost_prevented_transit == "t0yes_t1no" ~ "t0yes_t1no"
+    #   , delta_cost_prevented_transit == "samet0t1" ~ "samet0t1"
+    #   , delta_cost_prevented_transit == "t0no_t1yes" ~ "t0no_t1yes"
+    #   , .default = delta_cost_prevented_transit
+    # )
+    # , delta_cost_prevented_transit = factor(
+    #   x = delta_cost_prevented_transit
+    #   , levels = c("t0yes_t1no","samet0t1","t0no_t1yes")
+    #   , ordered = T
+    # )
+    )
+
+a <- table(teste$treatment, teste$delta_cost_prevented_transit) %>% as.matrix()
+a1 <- table(teste$treatment, teste$delta_cost_prevented_transit) %>% as.matrix() %>% 
+  t()
+
+(b <- pairwiseNominalIndependence(
+  a,
+  fisher = TRUE,
+  gtest  = FALSE,
+  chisq  = FALSE,
+  digits = 3
+)
+)
+
+cldList(comparison = b$Comparison,
+        p.value    = b$p.adj.Fisher,
+        threshold  = 0.05)
+```
 
 
-stats::fisher.test(table(
-  df_diff_trips_wave$treatment_control_4
-  , df_diff_trips_wave$diff_trips_wave)
-  , simulate.p.value = T
-  , B = 100000L
+# multivariate model
+
+
+```{r}
+df_model <- df_tc %>% 
+  dplyr::filter(wave=="Second") %>% 
+  dplyr::select(
+    response_id
+    , wave
+    , treatment
+    
+    , age_groups_5_all
+    , visible_minority
+    , immigrant
+    , gender
+    , educ_has_postsec
+    , any_mobility_limitation
+    , any_functional_limitation
+    , employment
+    , income_groups2
+    , in_lim
+    , has_vehicle_household
+  ) %>% dplyr::left_join(
+    df_outcomes %>% select(
+      response_id, treatment
+      , dplyr::matches("delta_satisfaction")
+      , delta_rides_enough_transit:delta_difficult_broad
+      , delta_type:new_type
+    )
+    , by = c("response_id","treatment")
   )
 
 ```
 
-# multivariate model
+
+```{r}
+model <- MASS::polr(
+  data = df_model
+  , delta_type ~
+    treatment
+    # + age_groups_5_all
+    # + visible_minority
+    # + immigrant
+    # # + gender
+    # + educ_has_postsec
+    # + any_mobility_limitation
+    # # + any_functional_limitation
+    # + employment
+    # # + income_groups2
+    + in_lim
+    # + has_vehicle_household
+  , Hess = T
+)
+```
+
+```{r}
+modelsummary(
+  list(
+    model
+    ),
+  stars = TRUE,
+  exponentiate = TRUE,
+  statistic = "conf.int"
+)
+```
+
+
+
+
 
 
 
