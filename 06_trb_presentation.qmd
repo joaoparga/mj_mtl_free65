@@ -328,13 +328,13 @@ df_tc <- df_tc %>%
       , ordered = T
     )
     , q109_4 = factor(
-      x = q109_3
+      x = q109_4
       , levels = c("Strongly Disagree","Disagree","Neither agree nor disagree"
           , "Agree","Strongly Agree")
       , ordered = T
     )
     , q109_5 = factor(
-      x = q109_3
+      x = q109_5
       , levels = c("Strongly Disagree","Disagree","Neither agree nor disagree"
           , "Agree","Strongly Agree")
       , ordered = T
@@ -804,7 +804,10 @@ df_outcome_main <- df_tc %>%
 df_outcome_main <- df_outcome_main %>% 
   mutate(
     delta_type = case_when(
+      # if same is NA -> remove facet na explicit
       main_type_first == main_type_second ~ "Same main mode"
+        # NA_character_
+        # "Same main mode"
         # 0L
       , main_type_first == "transit" &
         main_type_second %nin% c("transit") ~ "Transit no longer main"
@@ -815,7 +818,10 @@ df_outcome_main <- df_outcome_main %>%
       , .default = NA_character_
     )
     , new_type = case_when(
+      
       main_type_first == main_type_second ~ "same"
+        # NA_character_
+        # "same"
       
       , (main_type_first != "active" |
         is.na(main_type_first)) &
@@ -1101,56 +1107,73 @@ openxlsx::write.xlsx(desc_variant, "output/df_variant_demographics.xlsx")
 descriptive 
 
 
-<!-- ```{r} -->
+```{r}
 
-<!-- desc_outcomes <- df_outcomes %>%  -->
-<!--   dplyr::filter(wave == "First") %>%  -->
-<!--   mutate(treatment = factor( -->
-<!--     treatment -->
-<!--     , levels = c(0L,1L) -->
-<!--     , labels = c("Control", "Treatment") -->
-<!--     , ordered = T)) %>%  -->
-<!--   select() %>%  -->
-<!--     mutate( -->
-<!--     across( -->
-<!--       .cols = -one_of("treatment") -->
-<!--       # don't change fct below for newer one -->
-<!--       , ~ forcats::fct_explicit_na(.x) -->
-<!--       ) -->
-<!--   ) %>%  -->
-<!--   # rename( -->
-<!--   #   "Any mobility limitation" = any_mobility_limitation -->
-<!--   #   # , "Any functional limitation" = any_functional_limitation -->
-<!--   #   , "Employment" = employment -->
-<!--   #   , "Annual income groups" = income_groups2 -->
-<!--   #   , "Household below LIM" = in_lim -->
-<!--   #   , "Has Vehicle in Household" = has_vehicle_household -->
-<!--   #   , "Treatment" = treatment -->
-<!--   # ) %>%  -->
-<!--       gtsummary::tbl_summary( -->
-<!--         type = gtsummary::all_dichotomous() ~ "categorical" -->
-<!--         , sort = list( -->
-<!--           `Any mobility limitation` ~ "frequency" -->
-<!--           , `Employment` ~ "frequency" -->
-<!--           , `Annual income groups` ~ "frequency" -->
-<!--           , `Household below LIM` ~ "frequency" -->
-<!--           , `Has Vehicle in Household` ~ "frequency" -->
-<!--         ) -->
-<!--         # all_categorical() ~ "frequency" -->
-<!--         # , missing = "always" -->
-<!--         , missing_text = "Missing" -->
-<!--         , missing_stat = "{p_miss}%" -->
-<!--         , by = `Treatment` -->
-<!--         , statistic = all_categorical() ~ "{p}%" -->
-<!--       ) %>%  -->
-<!--       gtsummary::add_overall(last = T,  -->
-<!--                              # col_label = "Total, N = {N}" -->
-<!--                              ) %>% -->
-<!--       gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>%  -->
-<!--   # gtsummary::modify_header() %>%  -->
-<!--   gtsummary::as_tibble() -->
+desc_outcomes <- df_outcomes %>% 
+  select(treatment
+         ,dplyr::matches("delta_satisfaction")
+         ,delta_rides_enough_transit:delta_difficult_broad
+         , delta_type:new_type
+         ) %>% 
+  mutate(
+    treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)
+    , 
+    ) %>%
+    mutate(
+    across(
+      .cols = -one_of("treatment")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>%
+  rename(
+    "Treatment" = treatment
+    , "Delta Satisf. Activity Participation" = delta_satisfaction_activity
+    , "Delta Satisf. Friends Family" = delta_satisfaction_friends_family
+    , "Delta Satisf. Recreation" = delta_satisfaction_recreation
+    , "Delta Satisf. Attend Events" = delta_satisfaction_attend_events
+    , "Delta Rides Enought Transit" = delta_rides_enough_transit
+    , "Delta Cost Prevents Transit" = delta_cost_prevented_transit
+    , "Delta Cost as Transit Barrier" = delta_transit_barrier_cost
+    , "Delta Difficulty Transport Expenses" = delta_difficult_broad
+    , "Delta Transit Main Mode" = delta_type
+    , "Delta New Type" = new_type
+  ) %>%
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          `Delta Satisf. Activity Participation` ~ "frequency"
+          ,`Delta Satisf. Friends Family` ~ "frequency"
+          ,`Delta Satisf. Recreation` ~ "frequency"
+          ,`Delta Satisf. Attend Events` ~ "frequency"
+          ,`Delta Rides Enought Transit` ~ "frequency"
+          ,`Delta Cost Prevents Transit` ~ "frequency"
+          ,`Delta Cost as Transit Barrier` ~ "frequency"
+          ,`Delta Difficulty Transport Expenses` ~ "frequency"
+          ,`Delta Transit Main Mode` ~ "frequency"
+          ,`Delta New Type` ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = `Treatment`
+        , statistic = all_categorical() ~ "{p}%"
+      ) %>%
+      # gtsummary::add_overall(last = T,
+      #                        # col_label = "Total, N = {N}"
+      #                        ) %>%
+      gtsummary::modify_caption(caption = "Descriptive statistics for categorical variables") %>%
+  # gtsummary::modify_header() %>%
+  gtsummary::as_tibble()
 
-<!-- ``` -->
+openxlsx::write.xlsx(desc_outcomes, "output/df_outcomes.xlsx")
+
+```
 
 
 
@@ -1213,7 +1236,64 @@ print(actual_stat+1.96*sqrt(Vneyman))
 
 
 
+## cramer v
+
+```{r}
+my_cramer_v <- function(data, variable, by, ...) {
+  table(data[[variable]], data[[by]]) %>%
+    rstatix::cramer_v()
+}
+```
+
 ## cost
+
+```{r}
+fisher_cost <- df_outcomes %>% 
+  select(
+    treatment
+    ,delta_rides_enough_transit
+    ,delta_difficult_broad
+    ) %>% 
+  mutate(
+    treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)
+    , 
+    ) %>% 
+  rename(
+    # "Delta Satisf. Activity Participation" = delta_satisfaction_activity
+    # , "Delta Satisf. Friends Family" = delta_satisfaction_friends_family
+    # , "Delta Satisf. Recreation" = delta_satisfaction_recreation
+    # , "Delta Satisf. Attend Events" = delta_satisfaction_attend_events
+    , "Delta Rides Enought Transit" = delta_rides_enough_transit
+    # , "Delta Cost Prevents Transit" = delta_cost_prevented_transit
+    # , "Delta Cost as Transit Barrier" = delta_transit_barrier_cost
+    , "Delta Difficulty Transport Expenses" = delta_difficult_broad
+    # , "Delta Transit Main Mode" = delta_type
+    # , "Delta New Type" = new_type
+  ) %>% 
+  tbl_summary(
+    by = treatment
+    , missing_text = "Missing"
+    , missing_stat = "{n}" # "({p_miss}%)"
+    ) %>% 
+  add_p(
+    list(all_categorical() ~ "fisher.test")
+  ) %>% 
+  add_significance_stars() %>% 
+  add_stat(
+    fns = list(all_categorical() ~ my_cramer_v)) %>% 
+  modify_header(
+    add_stat_1 ~ "Cramer V (Effect size)"
+    , p.value ~ "Fisher exact test (p-value)"
+    ) %>% 
+  gtsummary::as_tibble()
+
+openxlsx::write.xlsx(fisher_cost, "output/df_fisher_cost.xlsx")
+```
+
 
 ```{r}
 # df_outcomes <- df_outcomes %>% 
@@ -1230,6 +1310,11 @@ riders enough transit: *NOT SIGNIFICANT*
 ```{r}
 # fisher test (2x2)
 stats::fisher.test(
+  df_outcome_cost$treatment
+  , df_outcome_cost$delta_rides_enough_transit
+)
+
+rstatix::cramer_v(
   df_outcome_cost$treatment
   , df_outcome_cost$delta_rides_enough_transit
 )
@@ -1326,6 +1411,56 @@ rstatix::pairwise_fisher_test(
 
 ## activity participation
 
+```{r}
+fisher_participation <- df_outcomes %>% 
+  select(
+    treatment
+    , delta_satisfaction_activity
+    , delta_satisfaction_friends_family
+    , delta_satisfaction_recreation
+    , delta_satisfaction_attend_events
+    ) %>% 
+  mutate(
+    treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)
+    , 
+    ) %>% 
+  rename(
+    "Delta Satisf. Activity Participation" = delta_satisfaction_activity
+    , "Delta Satisf. Friends Family" = delta_satisfaction_friends_family
+    , "Delta Satisf. Recreation" = delta_satisfaction_recreation
+    , "Delta Satisf. Attend Events" = delta_satisfaction_attend_events
+    # , "Delta Rides Enought Transit" = delta_rides_enough_transit
+    # , "Delta Cost Prevents Transit" = delta_cost_prevented_transit
+    # , "Delta Cost as Transit Barrier" = delta_transit_barrier_cost
+    # , "Delta Difficulty Transport Expenses" = delta_difficult_broad
+    # , "Delta Transit Main Mode" = delta_type
+    # , "Delta New Type" = new_type
+  ) %>% 
+  tbl_summary(
+    by = treatment
+    , missing_text = "Missing"
+    , missing_stat = "{n}" # ({p_miss}%)"
+    ) %>% 
+  add_p(
+    list(all_categorical() ~ "fisher.test")
+  ) %>% 
+  add_significance_stars() %>% 
+  add_stat(
+    fns = list(all_categorical() ~ my_cramer_v)) %>% 
+  modify_header(
+    add_stat_1 ~ "Cramer V (Effect size)"
+    , p.value ~ "Fisher exact test (p-value)"
+    ) %>% 
+  gtsummary::as_tibble()
+
+openxlsx::write.xlsx(fisher_participation, "output/df_fisher_participation.xlsx")
+```
+
+
 INCOMPLETE
 
 ```{r}
@@ -1339,6 +1474,54 @@ chisq_test(
 
 ## diff trips per wave
 
+```{r}
+fisher_type <- df_outcomes %>% 
+  select(
+    treatment
+    , delta_type
+    , new_type
+    # ,dplyr::matches("delta_satisfaction")
+    ) %>% 
+  mutate(
+    treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)
+    , 
+    ) %>% 
+  rename(
+    # "Delta Satisf. Activity Participation" = delta_satisfaction_activity
+    # , "Delta Satisf. Friends Family" = delta_satisfaction_friends_family
+    # , "Delta Satisf. Recreation" = delta_satisfaction_recreation
+    # , "Delta Satisf. Attend Events" = delta_satisfaction_attend_events
+    # , "Delta Rides Enought Transit" = delta_rides_enough_transit
+    # , "Delta Cost Prevents Transit" = delta_cost_prevented_transit
+    # , "Delta Cost as Transit Barrier" = delta_transit_barrier_cost
+    # , "Delta Difficulty Transport Expenses" = delta_difficult_broad
+    , "Delta Transit Main Mode" = delta_type
+    , "Delta New Main Type" = new_type
+  ) %>% 
+  tbl_summary(
+    by = treatment
+    , missing_text = "Missing"
+    , missing_stat = "{n}" #({p_miss}%)"
+    ) %>% 
+  add_p(
+    list(all_categorical() ~ "fisher.test")
+  ) %>% 
+  add_significance_stars() %>% 
+  add_stat(
+    fns = list(all_categorical() ~ my_cramer_v)) %>% 
+  modify_header(
+    add_stat_1 ~ "Cramer V (Effect size)"
+    , p.value ~ "Fisher exact test (p-value)"
+    ) %>% 
+  gtsummary::as_tibble()
+
+openxlsx::write.xlsx(fisher_type, "output/df_fisher_type.xlsx")
+```
+
 INCOMPLETE
 
 ```{r}
@@ -1351,7 +1534,7 @@ https://rcompanion.org/rcompanion/b_07.html
 http://www.biostathandbook.com/fishers.html
 
 ```{r}
-teste <- df_outcome_cost %>% 
+teste <- df_outcomes %>% 
   mutate(
     treatment = case_when(
       treatment == 0L ~ "Control"
@@ -1371,9 +1554,9 @@ teste <- df_outcome_cost %>%
     # )
     )
 
-a <- table(teste$treatment, teste$delta_cost_prevented_transit) %>% as.matrix()
-a1 <- table(teste$treatment, teste$delta_cost_prevented_transit) %>% as.matrix() %>% 
-  t()
+a <- table(teste$treatment, teste$delta_rides_enough_transit) %>% as.matrix()
+# a1 <- table(teste$treatment, teste$delta_cost_prevented_transit) %>% as.matrix() %>% 
+#   t()
 
 (b <- pairwiseNominalIndependence(
   a,
@@ -1388,6 +1571,92 @@ cldList(comparison = b$Comparison,
         p.value    = b$p.adj.Fisher,
         threshold  = 0.05)
 ```
+
+# delta new main type
+
+```{r}
+new_type <- df_tc %>% count(wave,treatment,main_type)
+new_type_wider <- new_type %>% 
+  pivot_wider(id_cols = c(treatment,main_type),names_from = wave
+                         , values_from = n) %>% 
+  mutate(
+    delta = Second - First
+    , `Percentual Change` = delta / First
+    ) %>% 
+  arrange(treatment,main_type)
+
+openxlsx::write.xlsx(new_type_wider, "output/df_new_type_wider.xlsx")
+
+```
+
+
+```{r}
+new_type_wider %>% 
+  select(treatment,main_type,`Percentual Change`) %>% 
+    mutate(
+    treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)
+    , 
+    ) %>% 
+tbl_summary(
+    by = treatment
+    , missing_text = "Missing"
+    , missing_stat = "{n}" #({p_miss}%)"
+    , statistic = list(all_continuous() ~ "{mean} ({sd})")
+    ) %>% 
+  # add_p(
+  #   # all_continuous() ~ "fisher.test"
+  #   # list(all_categorical() ~ "fisher.test")
+  # ) %>% 
+  add_difference() #%>% 
+  # add_significance_stars() %>% 
+  # add_stat(
+  #   fns = list(all_categorical() ~ my_cramer_v)) %>% 
+  # modify_header(
+  #   add_stat_1 ~ "Cramer V (Effect size)"
+  #   , p.value ~ "Fisher exact test (p-value)"
+  #   ) #%>% 
+  # gtsummary::as_tibble()
+```
+
+## stb strata difference
+
+```{r}
+df_tc %>% 
+  select(wave,treatment,main_type) %>% 
+    mutate(
+    treatment = factor(
+    treatment
+    , levels = c(0L,1L)
+    , labels = c("Control", "Treatment")
+    , ordered = T)
+    , 
+    ) %>% 
+    tbl_strata(
+    strata = treatment
+    , .header = "**{strata}, N = {N}**"
+    , ~.x %>% 
+tbl_summary(
+    by = wave
+    , missing_text = "Missing"
+    , missing_stat = "{n}" #({p_miss}%)"
+    , statistic = list(
+      all_continuous() ~ "{mean} ({sd})"
+      ,all_dichotomous() ~ "{p}%"
+      )
+    ) %>% 
+  # add_p(
+  #   # all_continuous() ~ "fisher.test"
+  #   # list(all_categorical() ~ "fisher.test")
+  # ) %>% 
+  # add_difference(group = wave) %>% 
+  add_p()
+)
+```
+
 
 
 # multivariate model
