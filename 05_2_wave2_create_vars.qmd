@@ -924,7 +924,7 @@ df_both <- df_both %>%
 
 
 
-### Vars by mode_destination
+### Vars by mode destination
 
 ```{r varsq22q96}
 df_count <- df_both

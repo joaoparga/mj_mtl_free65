@@ -202,6 +202,11 @@ df_attrition %>% filter(wave=="First") %>% ggplot(aes(x=age_corrected))+geom_his
 
 ## treatment and control
 
+### option 1
+
+- treatment: 65+ + t1_pass
+- control: 65+ + t1_nopass
+
 what to do with people 50-64 who declared having the free pass?
 
 IMPORTANT: ON WAVE 1, Q97 (Do you currently have the Free 65+ fare loaded on your Opus card?) WAS ONLY ASKED TO PEOPLE 65+
@@ -275,6 +280,17 @@ df_both <- data.table::rbindlist(
 #   )
 # )
 ```
+
+### option 2
+
+- treatment: 65+ + t1_pass
+- control: 60-64 (t1_nopass -> remove 60-64 with pass?)
+
+
+### option 3
+
+- treatment: 65+ + t1_pass
+- control: 50-64 (t1_nopass -> remove 50-64 with pass?)
 
 # filter by control/treatment
 
@@ -769,6 +785,17 @@ df_outcome_trips[paste0("delta_", colunas)] <-
     ,~.x - .y
     )
 
+df_outcome_trips <- df_outcome_trips %>%  dplyr::left_join(
+  df_second %>% 
+    select(response_id,treatment,count_trips_total)
+  , by = c("response_id","treatment")
+) %>% 
+  relocate(
+    count_trips_total
+    , .after = treatment
+  )
+  
+
 ```
 
 
@@ -1173,6 +1200,45 @@ desc_outcomes <- df_outcomes %>%
 
 openxlsx::write.xlsx(desc_outcomes, "output/df_outcomes.xlsx")
 
+```
+
+
+# DETECT OUTLIERS: travel behaviour
+
+```{r}
+summary(df_outcome_trips$count_trips_total)
+
+df_outcome_trips %>%
+  ggplot(
+    aes(x=count_trips_wave_second)
+    ) +
+   geom_histogram(binwidth = 1) #+
+  # scale_x_continuous(breaks = seq(50,100,5))
+
+df_tc %>%
+  ggplot(
+    aes(x=avg_trips_weekly_total)
+    ) +
+   geom_histogram(
+     binwidth = 2
+     ) +
+  facet_wrap(~wave)
+  # scale_x_continuous(breaks = seq(50,100,5))
+```
+
+boxplot
+```{r}
+df_tc %>%
+  ggplot(
+    aes(y=count_trips_wave, x = treatment, group = treatment)
+    ) +
+   geom_boxplot(
+     # position = "jitter"
+     ) +
+  # coord_flip() +
+  geom_jitter() +
+  facet_wrap(~wave) +
+  scale_x_continuous(breaks = seq(0,70,5))
 ```
 
 
