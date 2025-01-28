@@ -1230,13 +1230,13 @@ data.table::setDT(df_trips)
 df_trips_total <- df_trips %>% 
   group_by(response_id) %>% 
   summarise(count_trips_total = sum(count, na.rm = T)) %>% 
-  mutate(avg_trips_weekly_total = count_trips_total / 7)
+  mutate(avg_trips_daily_total = count_trips_total / 7)
 
 # count total trips wave
 df_trips_wave <- df_trips %>% 
   group_by(response_id, wave) %>% 
   summarise(count_trips_wave = sum(count, na.rm = T)) %>% 
-  mutate(avg_trips_weekly_wave = count_trips_wave / 7)
+  mutate(avg_trips_daily_wave = count_trips_wave / 7)
 
 
 # count modes used
@@ -1447,7 +1447,12 @@ df_both <- df_both %>%
   dplyr::left_join(l_trips_wave$df_main_trip_mode %>% select(response_id,wave,main_mode)
                    , by = c("response_id","wave")) %>% 
   dplyr::left_join(l_trips_wave$df_main_trip_type %>% select(response_id,wave,main_type)
-                   , by = c("response_id","wave"))
+                   , by = c("response_id","wave")) %>% 
+  dplyr::left_join(
+    df_count %>% 
+      select(response_id, wave, contains("last_7"))
+    , by = c("response_id","wave")
+    )
 ```
 
 ### Recode factor levels

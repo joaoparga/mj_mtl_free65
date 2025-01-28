@@ -756,6 +756,8 @@ df_outcome_cost <- df_outcome_cost %>%
 
 ### count trips wave
 
+
+
 NEXT STEPS: UNDERTSAND OUTLIERS IN TRIP GENERATION
 
 ```{r}
@@ -796,6 +798,27 @@ df_outcome_trips <- df_outcome_trips %>%  dplyr::left_join(
   )
   
 
+```
+
+
+### CHECK COUNT TRIPS 
+run this after running file 05_2_createvars (must use df_count)
+compare df_count of work trips (b) on first wave to count of coun_trips_work_first (a)
+```{r}
+df_work <- df_count %>% 
+  select(response_id, wave, contains("work")) 
+
+df_work <- df_work %>% 
+  replace(is.na(.), 0) %>% 
+  mutate(
+    sum_work = rowSums(across(mode_stm_bus_dest_work:mode_rem_dest_work))
+  )
+
+b <- df_work %>% 
+  filter(wave=="First" & response_id %in% unique(df_tc$response_id)) %>% 
+  count(sum_work)
+
+a <- df_outcome_trips %>% count(count_trips_work_first)
 ```
 
 
@@ -1217,7 +1240,7 @@ df_outcome_trips %>%
 
 df_tc %>%
   ggplot(
-    aes(x=avg_trips_weekly_total)
+    aes(x=avg_trips_daily_total)
     ) +
    geom_histogram(
      binwidth = 2
