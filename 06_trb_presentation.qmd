@@ -805,20 +805,21 @@ df_outcome_trips <- df_outcome_trips %>%  dplyr::left_join(
 run this after running file 05_2_createvars (must use df_count)
 compare df_count of work trips (b) on first wave to count of coun_trips_work_first (a)
 ```{r}
-df_work <- df_count %>% 
-  select(response_id, wave, contains("work")) 
+# df_work <- df_count %>% 
+#   select(response_id, wave, contains("work")) 
 
-df_work <- df_work %>% 
-  replace(is.na(.), 0) %>% 
-  mutate(
-    sum_work = rowSums(across(mode_stm_bus_dest_work:mode_rem_dest_work))
-  )
+# df_work <- df_work %>% 
+#   replace(is.na(.), 0) %>% 
+#   mutate(
+#     sum_work = rowSums(across(mode_stm_bus_dest_work:mode_rem_dest_work))
+#   )
+# 
+# b <- df_work %>% 
+#   filter(wave=="First" & response_id %in% unique(df_tc$response_id)) %>% 
+#   count(sum_work)
+# 
+# a <- df_outcome_trips %>% count(count_trips_work_first)
 
-b <- df_work %>% 
-  filter(wave=="First" & response_id %in% unique(df_tc$response_id)) %>% 
-  count(sum_work)
-
-a <- df_outcome_trips %>% count(count_trips_work_first)
 ```
 
 
@@ -1227,6 +1228,59 @@ openxlsx::write.xlsx(desc_outcomes, "output/df_outcomes.xlsx")
 
 
 # DETECT OUTLIERS: travel behaviour
+
+https://trevorfrench.github.io/R-for-Data-Analysis/p3c3-outliers.html#density-plot
+https://statsandr.com/blog/outliers-detection-in-r/#z-scores
+
+## rationale
+questions: 
+q22
+q95
+q82
+q83
+q84
+q85
+q81
+q86
+q87
+q88
+q89
+q90
+q91
+q92
+q94
+q117
+
+Phrasing: `In the last seven days, how many times did you use < mode x > to travel to or from each of the following activities?`
+
+
+## reasonable number of trips per day
+Example: 
+
+JP tuesday jan 28th
+University: 2 (1 going 1 back)
+Groceries: 2 (1 going 1 back)
+
+JP wednesday jan 29th
+University: 2 (1 going 1 back)
+Physiotherapy:  2 (1 going 1 back)
+
+If one needs only 1 leg to work/study + 1 extra activity every day, that would result in 4 trips on a regular/normal day.
+On an exceptional day, that count would go up to 1 or 2 additional round trips (6 or 8)
+
+## scatter plot
+
+## box plot
+
+## histogram
+
+## standard deviation
+
+## z scores
+
+## hampel filter
+
+## Statistical tests
 
 ```{r}
 summary(df_outcome_trips$count_trips_total)
