@@ -765,39 +765,63 @@ df_outcome_trips <- df_tc %>%
   select(
     response_id,wave,treatment,
     starts_with("count")
+    , "avg_trips_daily_wave"
     , -c("count_trips_total")
     ) %>% 
   pivot_wider(
     id_cols = c("response_id","treatment")
     , names_from = wave
-    , values_from = starts_with("count")
+    , values_from = count_trips_wave:avg_trips_daily_wave
     # , names_prefix = "satisfaction_participation_"
   ) %>% 
   janitor::clean_names()
 
 colunas <- df_tc %>%
-  select(starts_with("count"), , -c("count_trips_total")) %>% 
-  colnames() %>% 
-  str_extract("(?<=count_).*")
+  select(
+    starts_with("count")
+    , "avg_trips_daily_wave"
+    ) %>% 
+  select(-count_trips_total) %>% 
+  colnames() #%>% 
+  # str_extract("(?<=count_).*")
 
 df_outcome_trips[paste0("delta_", colunas)] <- 
   map2(
+    # .x
     df_outcome_trips %>% select(ends_with("first"))
+    # .y
     , df_outcome_trips %>% select(ends_with("second"))
-    ,~.x - .y
+    # delta = y - x
+    , ~.y - .x
     )
 
 df_outcome_trips <- df_outcome_trips %>%  dplyr::left_join(
   df_second %>% 
-    select(response_id,treatment,count_trips_total)
+    select(response_id,treatment,count_trips_total, avg_trips_daily_total)
   , by = c("response_id","treatment")
 ) %>% 
   relocate(
-    count_trips_total
+    c(count_trips_total,avg_trips_daily_total)
     , .after = treatment
-  )
+  ) 
   
 
+```
+
+If long format is needed, develop code below (use map)
+https://stackoverflow.com/questions/70652460/difference-between-rows-in-long-format-for-r-based-on-other-column-variables
+
+```{r}
+# df_tc %>% 
+#   select(
+#     response_id,wave,treatment,
+#     starts_with("count")
+#     , "avg_trips_daily_wave"
+#     , -c("count_trips_total")
+#   ) %>% 
+#   group_by(response_id, treatment) %>% 
+#   mutate(delta = diff(count_trips_wave)) %>% 
+#   select(response_id,wave,treatment,count_trips_wave, delta)
 ```
 
 
@@ -1255,8 +1279,10 @@ Phrasing: `In the last seven days, how many times did you use < mode x > to trav
 
 
 ## reasonable number of trips per day
-Example: 
+Own example
+* Considering each leg of the trip as a trip:
 
+** Weekdays
 JP tuesday jan 28th
 University: 2 (1 going 1 back)
 Groceries: 2 (1 going 1 back)
@@ -1265,8 +1291,49 @@ JP wednesday jan 29th
 University: 2 (1 going 1 back)
 Physiotherapy:  2 (1 going 1 back)
 
-If one needs only 1 leg to work/study + 1 extra activity every day, that would result in 4 trips on a regular/normal day.
-On an exceptional day, that count would go up to 1 or 2 additional round trips (6 or 8)
+If one needs only `2` trips (1 leg going, 1 back) to work + 1 extra activity every day (`2` trips = 1 going + 1 back), that would result in 4 trips on a regular/normal weekday.
+
+That would mean `4 x 5 (workdays) = 20 trips` on the weekdays
+
+On an exceptional day, that count could go up to 1 or 2 additional round trips (6 or 8)
+
+** Weekend
+1 trips on each day of the weekend (2 + 2) = 4
+
+** Total
+20 (weekdays) + 4 (weekends) = `24 trips on a week`, 
+meaning `24/7 = 3.4` trips daily
+
+
+* Considering both legs of the trip as single trip: 1/2 of the previous
+
+10 (weekdays) + 2 (weekends) = `12 trips on a week`, 
+meaning `12/7 = 1.7` trips daily
+
+
+### Literature
+
+Chudyk et al (2015): Vancouver: median 2.5 trips a day
+Dejoux et al (2010): MTL (projection based on 2005 census): 
+- 65-74: 2.17 (2006) and 3.01 (2021)
+- 75 and over: 1.44 (2006) and 1.98 (2021)
+
+COMPARE age groups
+50-64
+65-75
+75+ 
+
+## summary
+
+```{r}
+#| results: hold
+summary(df_outcome_trips$count_trips_total)
+df_outcome_trips %>% dplyr::filter(
+  
+)
+summary(df_outcome_trips$count_trips_total)
+```
+
 
 ## scatter plot
 
@@ -1283,7 +1350,7 @@ On an exceptional day, that count would go up to 1 or 2 additional round trips (
 ## Statistical tests
 
 ```{r}
-summary(df_outcome_trips$count_trips_total)
+
 
 df_outcome_trips %>%
   ggplot(
