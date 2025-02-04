@@ -1327,15 +1327,21 @@ COMPARE age groups
 
 ```{r}
 #| results: hold
-summary(df_outcome_trips$count_trips_total)
-df_outcome_trips %>% dplyr::filter(
-  
-)
-summary(df_outcome_trips$count_trips_total)
+data.table::setDT(df_outcome_trips)
+
+# summary total
+summary(df_outcome_trips$avg_trips_daily_wave_first)
+summary(df_outcome_trips$avg_trips_daily_wave_second)
+
+# summary by treatment
+df_outcome_trips[, as.list(summary(count_trips_total)), by = "treatment"]
+
 ```
 
 
 ## scatter plot
+
+
 
 ## box plot
 
@@ -1374,7 +1380,7 @@ boxplot
 ```{r}
 df_tc %>%
   ggplot(
-    aes(y=count_trips_wave, x = treatment, group = treatment)
+    aes(y=avg_trips_daily_wave, x = treatment, group = treatment)
     ) +
    geom_boxplot(
      # position = "jitter"
