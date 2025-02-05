@@ -93,6 +93,7 @@ library(rstatix)
 library(openxlsx)
 library(MASS)
 library(rcompanion)
+library(mvoutlier)
 # library(Z.gtsummary.addons)
 
 `%nin%` = Negate(`%in%`)
@@ -1330,53 +1331,59 @@ COMPARE age groups
 data.table::setDT(df_outcome_trips)
 
 # summary total
+summary(df_outcome_trips$avg_trips_daily_total)
+
+# summary by wave
 summary(df_outcome_trips$avg_trips_daily_wave_first)
 summary(df_outcome_trips$avg_trips_daily_wave_second)
 
 # summary by treatment
-df_outcome_trips[, as.list(summary(count_trips_total)), by = "treatment"]
+df_outcome_trips[, as.list(summary(avg_trips_daily_wave_first)), by = "treatment"]
+df_outcome_trips[, as.list(summary(avg_trips_daily_wave_second)), by = "treatment"]
 
+# include demographics on outcomes
+df_outcome_trips <- df_outcome_trips %>% 
+  dplyr::left_join(
+    df_tc %>% 
+      filter(wave=="First") %>% 
+      select(response_id, age_groups_5_all)
+    , by = c("response_id")
+  )
+
+# summary by age group
+df_outcome_trips[
+  , as.list(summary(avg_trips_daily_wave_first)), by = "age_groups_5_all"
+  ]
+```
+
+## histogram
+
+```{r}
+df_tc %>%
+  ggplot(
+    aes(x=avg_trips_daily_wave)
+    ) +
+   geom_histogram(
+     binwidth = 1
+     ) +
+  facet_wrap(~wave)
 ```
 
 
 ## scatter plot
 
+```{r}
+df_outcome_trips %>% 
+  ggplot(aes(x = avg_trips_daily_wave_first, y =avg_trips_daily_wave_second)) + 
+  geom_point() +
+  scale_x_continuous(breaks = seq(0,50,5)) +
+  scale_y_continuous(breaks = seq(0,40,5))
+```
 
 
 ## box plot
 
-## histogram
-
-## standard deviation
-
-## z scores
-
-## hampel filter
-
-## Statistical tests
-
-```{r}
-
-
-df_outcome_trips %>%
-  ggplot(
-    aes(x=count_trips_wave_second)
-    ) +
-   geom_histogram(binwidth = 1) #+
-  # scale_x_continuous(breaks = seq(50,100,5))
-
-df_tc %>%
-  ggplot(
-    aes(x=avg_trips_daily_total)
-    ) +
-   geom_histogram(
-     binwidth = 2
-     ) +
-  facet_wrap(~wave)
-  # scale_x_continuous(breaks = seq(50,100,5))
-```
-
-boxplot
+by treatment and control
 ```{r}
 df_tc %>%
   ggplot(
@@ -1390,6 +1397,90 @@ df_tc %>%
   facet_wrap(~wave) +
   scale_x_continuous(breaks = seq(0,70,5))
 ```
+
+by age group (5 age interval)
+
+```{r}
+df_tc %>%
+    ggplot(
+        aes(y=avg_trips_daily_wave, x = age_groups_5_all, group = age_groups_5_all)
+    ) +
+    geom_boxplot(
+        # position = "jitter"
+    ) +
+    # coord_flip() +
+    geom_jitter() +
+    facet_wrap(~wave) 
+```
+
+## quantiles
+
+```{r}
+quantiles <- quantile(
+  df_outcome_trips$avg_trips_daily_total
+  , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 1L)
+  , na.rm = T
+  )
+df_outcome_trips$bin_avg_total <- cut(
+  df_outcome_trips$avg_trips_daily_total
+  , breaks = quantiles
+  )
+
+df_outcome_trips %>% count(bin_avg_total)
+```
+
+```{r}
+df_outcome_trips %>% 
+  ggplot(
+    aes(x = avg_trips_daily_wave_first
+        , y = avg_trips_daily_wave_second
+        , colour = bin_avg_total
+        )
+    ) + 
+  geom_point() +
+  scale_x_continuous(breaks = seq(0,50,5)) +
+  scale_y_continuous(breaks = seq(0,40,5)) 
+```
+
+Above 95% as outliers
+```{r}
+ub95 <- quantile(df_outcome_trips$avg_trips_daily_total, 0.95)
+outlier95 <- which(df_outcome_trips$avg_trips_daily_total > ub95)
+df_outcome_trips[outlier95]
+```
+
+
+
+## standard deviation
+
+## z scores
+
+```{r}
+df_outcome_trips$z_avg_first <- scale(df_outcome_trips$avg_trips_daily_wave_first)
+# df_outcome_trips %>% 
+#   ggplot() +
+#   geom_histogram(aes(z_avg_first))
+
+summary(df_outcome_trips$z_avg_first)
+
+df_outcome_trips$z_avg_second <- scale(
+  df_outcome_trips$avg_trips_daily_wave_second
+  )
+```
+
+
+## hampel filter
+
+## mvoutlier package
+
+```{r}
+Y <- as.matrix(
+  df_outcome_trips[,c("avg_trips_daily_wave_first","avg_trips_daily_wave_second")]
+  )
+
+res <- mvoutlier::aq.plot(Y)
+```
+
 
 
 

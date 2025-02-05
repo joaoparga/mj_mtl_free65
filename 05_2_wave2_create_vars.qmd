@@ -1230,7 +1230,7 @@ data.table::setDT(df_trips)
 df_trips_total <- df_trips %>% 
   group_by(response_id) %>% 
   summarise(count_trips_total = sum(count, na.rm = T)) %>% 
-  mutate(avg_trips_daily_total = count_trips_total / 7)
+  mutate(avg_trips_daily_total = count_trips_total / 14)
 
 # count total trips wave
 df_trips_wave <- df_trips %>% 
