@@ -1314,6 +1314,8 @@ meaning `12/7 = 1.7` trips daily
 
 ### Literature
 
+CHECK HOW THESE STUDIES ESTIMATED/HOW THE QUESTION WAS ASKED
+
 Chudyk et al (2015): Vancouver: median 2.5 trips a day
 Dejoux et al (2010): MTL (projection based on 2005 census): 
 - 65-74: 2.17 (2006) and 3.01 (2021)
@@ -1323,6 +1325,8 @@ COMPARE age groups
 50-64
 65-75
 75+ 
+
+COMBINE ABOVE 80
 
 ## summary
 
@@ -1353,6 +1357,10 @@ df_outcome_trips <- df_outcome_trips %>%
 # summary by age group
 df_outcome_trips[
   , as.list(summary(avg_trips_daily_wave_first)), by = "age_groups_5_all"
+  ]
+
+df_outcome_trips[
+  , as.list(summary(avg_trips_daily_wave_second)), by = "age_groups_5_all"
   ]
 ```
 
@@ -1418,7 +1426,7 @@ df_tc %>%
 ```{r}
 quantiles <- quantile(
   df_outcome_trips$avg_trips_daily_total
-  , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 1L)
+  , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 0.99, 1L)
   , na.rm = T
   )
 df_outcome_trips$bin_avg_total <- cut(
@@ -1453,7 +1461,15 @@ df_outcome_trips[outlier95]
 
 ## standard deviation
 
+CHECK STANDARD DEVIATION
+```{r}
+
+```
+
+
 ## z scores
+
+CHECK LATER: non-parametrical statistical test for a left skewed distribution
 
 ```{r}
 df_outcome_trips$z_avg_first <- scale(df_outcome_trips$avg_trips_daily_wave_first)
