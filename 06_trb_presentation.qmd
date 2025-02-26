@@ -94,6 +94,7 @@ library(openxlsx)
 library(MASS)
 library(rcompanion)
 library(mvoutlier)
+library(psych)
 # library(Z.gtsummary.addons)
 
 `%nin%` = Negate(`%in%`)
@@ -140,7 +141,12 @@ load(file = "data/list_count_trips_wave.RData")
 # keep only respondents who answered both waves
 df_attrition <- df_full %>% 
   filter(response_rate=="Started wave 2")
+```
 
+
+Create new income groups by grouping original ones
+
+```{r group income groups}
 df_attrition <- df_attrition %>% 
   mutate(
     income_groups2 = case_when(
@@ -171,8 +177,6 @@ df_attrition <- df_attrition %>%
   )
 ```
 
-
-
 ### change age_corrected (and, thus, age_groups_control_treat)
 what to do with people age_raw = 65 and age_corrected = 64?
 A: do not change age_corrected based on q4 (binary what is your age: 50-64 or 65+)
@@ -193,15 +197,7 @@ Obs.: I've changed 05_2_create_vars to remove the code that previously changed i
 
 # Define variables
 
-## age histogram
-
-age histogram
-```{r}
-df_attrition %>% filter(wave=="First") %>% ggplot(aes(x=age_corrected))+geom_histogram(binwidth = 1)+scale_x_continuous(breaks = seq(50,100,5))
-```
-
-
-## treatment and control
+## treatment and control (MOVE TO AFTER OTHER VARIABLE CHANGES)
 
 ### option 1
 
@@ -217,14 +213,17 @@ Resolução provisória para a formatação long da base dados
 
 ```{r}
 
-
 df_second <- df_attrition %>% 
   filter(wave=="Second") %>% 
   mutate(
     treatment = case_when(
-    age_groups_binary == "65+" & has_free_pass_wave2 == "No" ~ 0L
-    , age_groups_binary == "65+" & has_free_pass_wave2 == "Yes" ~ 1L
-    , .default = NA_integer_
+    
+    age_corrected >= 65L & has_free_pass_wave2 == "No" ~ "Control" # 0L    
+    # age_groups_binary == "65+" & has_free_pass_wave2 == "No" ~ "Control" # 0L
+  
+      , age_corrected >= 65L & has_free_pass_wave2 == "Yes" ~ "Treatment" # 1L
+    # , age_groups_binary == "65+" & has_free_pass_wave2 == "Yes" ~ "Treatment" # 1L
+    , .default = NA_character_
   )
   # other treat
   )
@@ -232,14 +231,16 @@ df_second <- df_attrition %>%
 df_first <- df_attrition %>% 
   filter(wave=="First") %>% 
   mutate(treatment = case_when(
-    response_id %in% setDT(df_second)[treatment==1L,response_id] ~ 1L
-    , response_id %in% setDT(df_second)[treatment==0L,response_id] ~ 0L
-    , .default = NA_integer_
+    response_id %in% setDT(df_second)[treatment=="Treatment",response_id] ~ "Treatment"
+    , response_id %in% setDT(df_second)[treatment=="Control",response_id] ~ "Control"
+    , .default = NA_character_
   ))
 
 df_both <- data.table::rbindlist(
   list(df_first,df_second)
 )
+
+rm(df_first, df_second, df_attrition)
 
 # OUTROS TIPOS DE TREATMENT & CONTROL (o t_c4 foi usado acima)
 # df_both <- df_both %>% mutate(
@@ -285,22 +286,87 @@ df_both <- data.table::rbindlist(
 ### option 2
 
 - treatment: 65+ + t1_pass
-- control: 60-64 (t1_nopass -> remove 60-64 with pass?)
+- control: 60-64 (t1_nopass -> remove 60-64 with pass)
+
+FOR NOW: REMOVE 60-64 WHO DECLARED HAVING A PASS ON T1
+
+```{r}
+df_second <- df_both %>% 
+  filter(wave == "Second") %>% 
+  mutate(
+    treatment_60_64 = case_when(
+      age_corrected >= 65L & has_free_pass_wave2 == "Yes" ~ "Treatment"
+      
+      , age_corrected >= 60L &
+        age_corrected <= 64L &
+        has_free_pass_wave2 == "No" ~ "Control"
+      
+      , .default = NA_character_
+    )
+  )
+
+df_first <- df_both %>% 
+  filter(wave=="First") %>% 
+  mutate(treatment_60_64 = case_when(
+    
+    response_id %in% setDT(df_second)[treatment_60_64=="Treatment",response_id] ~ "Treatment"
+    
+    , response_id %in% setDT(df_second)[treatment_60_64=="Control",response_id] ~ "Control"
+    
+    , .default = NA_character_
+  ))
+
+df_both <- data.table::rbindlist(
+  list(df_first,df_second)
+)
+
+rm(df_first, df_second)
+```
 
 
 ### option 3
 
 - treatment: 65+ + t1_pass
-- control: 50-64 (t1_nopass -> remove 50-64 with pass?)
+- control: 50-64 (t1_nopass -> remove 50-64 with pass)
 
-# filter by control/treatment
+FOR NOW: REMOVE 50-64 WHO DECLARED HAVING A PASS ON T1
 
 ```{r}
-df_tc <- df_both %>% filter(!is.na(treatment))
+df_second <- df_both %>% 
+  filter(wave == "Second") %>% 
+  mutate(
+    treatment_50_64 = case_when(
+      age_corrected >= 65L & has_free_pass_wave2 == "Yes" ~ "Treatment"
+      
+      , age_corrected >= 50L &
+        age_corrected <= 64L &
+        has_free_pass_wave2 == "No" ~ "Control"
+      
+      , .default = NA_character_
+    )
+  )
+
+df_first <- df_both %>% 
+  filter(wave=="First") %>% 
+  mutate(treatment_50_64 = case_when(
+    
+    response_id %in% setDT(df_second)[treatment_50_64=="Treatment",response_id] ~ "Treatment"
+    
+    , response_id %in% setDT(df_second)[treatment_50_64=="Control",response_id] ~ "Control"
+    
+    , .default = NA_character_
+  ))
+
+df_both <- data.table::rbindlist(
+  list(df_first,df_second)
+)
+
+rm(df_first, df_second)
 ```
 
 
-## outcomes
+# Clean outcome variables
+
 
 OK
 - satisfaction with activity participation
@@ -313,7 +379,7 @@ OK
 
 ```{r}
 # relevel factors
-df_tc <- df_tc %>% 
+df_both <- df_both %>% 
   mutate(
     satisfaction_activity_participation = fct_relevel(
       satisfaction_activity_participation
@@ -322,12 +388,16 @@ df_tc <- df_tc %>%
 ```
 
 
-### change in satisfaction activity
+
+### TBD: factor/PCA analysis: satisfaction
+INCOMPLTE!
+
+### code ordered factors
 
 Transform variables into ordered factors
 
 ```{r}
-df_tc <- df_tc %>% 
+df_both <- df_both %>% 
   mutate(
     satisfaction_activity_participation = factor(
       x = satisfaction_activity_participation
@@ -336,7 +406,7 @@ df_tc <- df_tc %>%
     )
   )
 
-df_tc <- df_tc %>% 
+df_both <- df_both %>% 
   mutate(
     q109_3 = factor(
       x = q109_3
@@ -362,14 +432,15 @@ df_tc <- df_tc %>%
 
 ```{r}
 
-df_outcome_participation <- df_tc %>% 
+df_outcome_participation <- df_both %>% 
   select(
-    response_id,wave,treatment,
-    satisfaction_activity_participation
+    response_id,wave
+    ,treatment,treatment_60_64, treatment_50_64
+    ,satisfaction_activity_participation
     , q109_3, q109_4, q109_5
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment")
+    id_cols = c("response_id","treatment", "treatment_60_64", "treatment_50_64")
     , names_from = wave
     , values_from = c(satisfaction_activity_participation,q109_3, q109_4, q109_5)
     # , names_prefix = "satisfaction_participation_"
@@ -592,10 +663,11 @@ df_outcome_participation <- df_outcome_participation %>%
 
 ```
 
-### change in relationship to cost
+
+## cost
 
 ```{r}
-df_tc <- df_tc %>% 
+df_both <- df_both %>% 
   mutate(
   difficulty_transport_expenses = factor(
     difficulty_transport_expenses
@@ -615,9 +687,10 @@ df_tc <- df_tc %>%
   )
 )
 
-df_outcome_cost <- df_tc %>% 
+df_outcome_cost <- df_both %>% 
   select(
-    response_id,wave,treatment
+    response_id,wave
+    ,treatment, treatment_60_64, treatment_50_64
 # Has the cost of transit ever prevented you from taking a trip using public transit?    
     , q101
 # Would you say you are riding transit as much as you would like?
@@ -631,7 +704,7 @@ df_outcome_cost <- df_tc %>%
     , difficulty_transport_expenses
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment")
+    id_cols = c("response_id","treatment", "treatment_60_64", "treatment_50_64")
     , names_from = wave
     , values_from = c(q100, q101, transit_barrier_cost_related
                       , q103, difficulty_transport_expenses)
@@ -755,29 +828,26 @@ df_outcome_cost <- df_outcome_cost %>%
   
 ```
 
-### count trips wave
-
-
-
-NEXT STEPS: UNDERTSAND OUTLIERS IN TRIP GENERATION
+## count trips 
 
 ```{r}
-df_outcome_trips <- df_tc %>% 
+df_outcome_trips <- df_both %>% 
   select(
-    response_id,wave,treatment,
-    starts_with("count")
+    response_id,wave
+    ,treatment,treatment_60_64, treatment_50_64
+    ,starts_with("count")
     , "avg_trips_daily_wave"
     , -c("count_trips_total")
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment")
+    id_cols = c("response_id","treatment","treatment_60_64", "treatment_50_64")
     , names_from = wave
     , values_from = count_trips_wave:avg_trips_daily_wave
     # , names_prefix = "satisfaction_participation_"
   ) %>% 
   janitor::clean_names()
 
-colunas <- df_tc %>%
+colunas <- df_both %>%
   select(
     starts_with("count")
     , "avg_trips_daily_wave"
@@ -797,13 +867,16 @@ df_outcome_trips[paste0("delta_", colunas)] <-
     )
 
 df_outcome_trips <- df_outcome_trips %>%  dplyr::left_join(
-  df_second %>% 
-    select(response_id,treatment,count_trips_total, avg_trips_daily_total)
-  , by = c("response_id","treatment")
+  df_both %>% 
+    filter(wave=="Second") %>% 
+    select(response_id
+           ,treatment,treatment_60_64, treatment_50_64
+           ,count_trips_total, avg_trips_daily_total)
+  , by = c("response_id","treatment", "treatment_60_64", "treatment_50_64")
 ) %>% 
   relocate(
     c(count_trips_total,avg_trips_daily_total)
-    , .after = treatment
+    , .after = treatment_50_64
   ) 
   
 
@@ -813,7 +886,7 @@ If long format is needed, develop code below (use map)
 https://stackoverflow.com/questions/70652460/difference-between-rows-in-long-format-for-r-based-on-other-column-variables
 
 ```{r}
-# df_tc %>% 
+# df_both %>% 
 #   select(
 #     response_id,wave,treatment,
 #     starts_with("count")
@@ -826,26 +899,26 @@ https://stackoverflow.com/questions/70652460/difference-between-rows-in-long-for
 ```
 
 
-### CHECK COUNT TRIPS 
-run this after running file 05_2_createvars (must use df_count)
-compare df_count of work trips (b) on first wave to count of coun_trips_work_first (a)
-```{r}
-# df_work <- df_count %>% 
-#   select(response_id, wave, contains("work")) 
+<!-- ### CHECK COUNT TRIPS  -->
+<!-- run this after running file 05_2_createvars (must use df_count) -->
+<!-- compare df_count of work trips (b) on first wave to count of coun_trips_work_first (a) -->
+<!-- ```{r} -->
+<!-- # df_work <- df_count %>%  -->
+<!-- #   select(response_id, wave, contains("work"))  -->
 
-# df_work <- df_work %>% 
-#   replace(is.na(.), 0) %>% 
-#   mutate(
-#     sum_work = rowSums(across(mode_stm_bus_dest_work:mode_rem_dest_work))
-#   )
-# 
-# b <- df_work %>% 
-#   filter(wave=="First" & response_id %in% unique(df_tc$response_id)) %>% 
-#   count(sum_work)
-# 
-# a <- df_outcome_trips %>% count(count_trips_work_first)
+<!-- # df_work <- df_work %>%  -->
+<!-- #   replace(is.na(.), 0) %>%  -->
+<!-- #   mutate( -->
+<!-- #     sum_work = rowSums(across(mode_stm_bus_dest_work:mode_rem_dest_work)) -->
+<!-- #   ) -->
+<!-- #  -->
+<!-- # b <- df_work %>%  -->
+<!-- #   filter(wave=="First" & response_id %in% unique(df_both$response_id)) %>%  -->
+<!-- #   count(sum_work) -->
+<!-- #  -->
+<!-- # a <- df_outcome_trips %>% count(count_trips_work_first) -->
 
-```
+<!-- ``` -->
 
 
 <!-- ```{r} -->
@@ -859,18 +932,24 @@ compare df_count of work trips (b) on first wave to count of coun_trips_work_fir
 <!-- ] -->
 <!-- ``` -->
 
-### used active or transit as main_type?
+
+
+
+## main_type
+
+Active or transit?
 
 ```{r}
-df_outcome_main <- df_tc %>% 
+df_outcome_main <- df_both %>% 
   select(
-    response_id,wave,treatment
+    response_id,wave
+    ,treatment,treatment_60_64, treatment_50_64
     # ,main_dest
     , main_mode
     , main_type
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment")
+    id_cols = c("response_id","treatment","treatment_60_64", "treatment_50_64")
     , names_from = wave
     , values_from = starts_with("main")
     # , names_prefix = "satisfaction_participation_"
@@ -961,23 +1040,320 @@ df_outcome_main <- df_outcome_main %>%
 ```{r}
 df_outcomes <- dplyr::left_join(
   df_outcome_participation %>% 
-    select(response_id,treatment, dplyr::matches("delta"))
+    select(response_id,treatment, treatment_60_64, treatment_50_64 
+           ,dplyr::matches("delta"))
   , df_outcome_cost %>% 
-    select(response_id,treatment, dplyr::matches("delta"))
-  , by = c("response_id", "treatment")
+    select(response_id,dplyr::matches("delta"))
+  , by = c("response_id")
 ) %>% 
   dplyr::left_join(
     df_outcome_trips %>% 
-    select(response_id,treatment, dplyr::matches("delta"))
-    , by = c("response_id", "treatment")
+    select(response_id,dplyr::matches("delta"))
+    , by = c("response_id")
   ) %>% 
   dplyr::left_join(
     df_outcome_main %>% 
-    select(response_id,treatment, dplyr::matches("delta"), new_type)
-    , by = c("response_id", "treatment")
+    select(response_id, dplyr::matches("delta"), new_type)
+    , by = c("response_id")
   )
 
 ```
+
+
+
+
+# DETECT OUTLIERS: travel behaviour
+
+https://trevorfrench.github.io/R-for-Data-Analysis/p3c3-outliers.html#density-plot
+https://statsandr.com/blog/outliers-detection-in-r/#z-scores
+
+## rationale
+questions: 
+q22
+q95
+q82
+q83
+q84
+q85
+q81
+q86
+q87
+q88
+q89
+q90
+q91
+q92
+q94
+q117
+
+Phrasing: `In the last seven days, how many times did you use < mode x > to travel to or from each of the following activities?`
+
+
+## reasonable number of trips per day
+Own example
+* Considering each leg of the trip as a trip:
+
+** Weekdays
+JP tuesday jan 28th
+University: 2 (1 going 1 back)
+Groceries: 2 (1 going 1 back)
+
+JP wednesday jan 29th
+University: 2 (1 going 1 back)
+Physiotherapy:  2 (1 going 1 back)
+
+If one needs only `2` trips (1 leg going, 1 back) to work + 1 extra activity every day (`2` trips = 1 going + 1 back), that would result in 4 trips on a regular/normal weekday.
+
+That would mean `4 x 5 (workdays) = 20 trips` on the weekdays
+
+On an exceptional day, that count could go up to 1 or 2 additional round trips (6 or 8)
+
+** Weekend
+1 trips on each day of the weekend (2 + 2) = 4
+
+** Total
+20 (weekdays) + 4 (weekends) = `24 trips on a week`, 
+meaning `24/7 = 3.4` trips daily
+
+
+* Considering both legs of the trip as single trip: 1/2 of the previous
+
+10 (weekdays) + 2 (weekends) = `12 trips on a week`, 
+meaning `12/7 = 1.7` trips daily
+
+
+### Literature
+
+CHECK HOW THESE STUDIES ESTIMATED/HOW THE QUESTION WAS ASKED
+
+Chudyk et al (2015): Vancouver: median 2.5 trips a day
+Dejoux et al (2010): MTL (projection based on 2005 census): 
+- 65-74: 2.17 (2006) and 3.01 (2021)
+- 75 and over: 1.44 (2006) and 1.98 (2021)
+
+COMPARE age groups
+50-64
+65-75
+75+ 
+
+COMBINE ABOVE 80
+
+## summary
+
+```{r}
+#| results: hold
+data.table::setDT(df_outcome_trips)
+
+# summary total
+summary(df_outcome_trips$avg_trips_daily_total)
+
+# summary by wave
+summary(df_outcome_trips$avg_trips_daily_wave_first)
+summary(df_outcome_trips$avg_trips_daily_wave_second)
+
+# summary by treatment
+df_outcome_trips[, as.list(summary(avg_trips_daily_wave_first)), by = "treatment"]
+df_outcome_trips[, as.list(summary(avg_trips_daily_wave_second)), by = "treatment"]
+
+# include demographics on outcomes
+df_outcome_trips <- df_outcome_trips %>% 
+  dplyr::left_join(
+    df_both %>% 
+      filter(wave=="First") %>% 
+      select(response_id, age_groups_5_grouped)
+    , by = c("response_id")
+  )
+
+# summary by age group
+df_outcome_trips[
+  , as.list(summary(avg_trips_daily_wave_first)), by = "age_groups_5_grouped"
+  ]
+
+df_outcome_trips[
+  , as.list(summary(avg_trips_daily_wave_second)), by = "age_groups_5_grouped"
+  ]
+```
+
+## histogram
+
+```{r}
+df_both %>%
+  filter(!is.na(treatment)) %>% 
+  ggplot(
+    aes(x=avg_trips_daily_wave)
+    ) +
+   geom_histogram(
+     binwidth = 1
+     ) +
+  facet_wrap(~wave)
+```
+
+
+## scatter plot
+
+```{r}
+df_outcome_trips %>% 
+  filter(!is.na(treatment)) %>% 
+  ggplot(aes(x = avg_trips_daily_wave_first, y = avg_trips_daily_wave_second)) + 
+  geom_point() +
+  scale_x_continuous(breaks = seq(0,50,5)) +
+  scale_y_continuous(breaks = seq(0,40,5))
+```
+
+
+## box plot
+
+by treatment and control
+```{r}
+df_both %>%
+  filter(!is.na(treatment)) %>% 
+  ggplot(
+    aes(y=avg_trips_daily_wave, x = treatment, group = treatment)
+    ) +
+   geom_boxplot(
+     # position = "jitter"
+     ) +
+  # coord_flip() +
+  geom_jitter() +
+  facet_wrap(~wave)
+```
+
+by age group (5 age interval)
+
+```{r}
+df_both %>%
+  filter(!is.na(treatment)) %>% 
+    ggplot(
+        aes(y=avg_trips_daily_wave, x = age_groups_5_grouped, group = age_groups_5_grouped)
+    ) +
+    geom_boxplot(
+        # position = "jitter"
+    ) +
+    # coord_flip() +
+    geom_jitter() +
+    facet_wrap(~wave) 
+```
+
+## quantiles
+
+```{r}
+#| results: hold
+quantiles_first <- quantile(
+  df_outcome_trips %>% 
+    filter(!is.na(treatment)) %>% 
+    pull(avg_trips_daily_wave_first)
+  , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 0.99, 1L)
+  , na.rm = T
+  )
+quantiles_second <- quantile(
+  df_outcome_trips %>% 
+    filter(!is.na(treatment)) %>% 
+    pull(avg_trips_daily_wave_second)
+  , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 0.99, 1L)
+  , na.rm = T
+  )
+
+df_outcome_trips$bin_avg_first <- cut(
+  df_outcome_trips$avg_trips_daily_wave_first
+  , breaks = quantiles_first
+  )
+
+df_outcome_trips$bin_avg_second <- cut(
+  df_outcome_trips$avg_trips_daily_wave_second
+  , breaks = quantiles_second
+  )
+
+df_outcome_trips %>% count(bin_avg_first)
+df_outcome_trips %>% count(bin_avg_second)
+```
+
+```{r}
+df_outcome_trips %>% 
+  filter(!is.na(treatment)) %>% 
+  ggplot(
+    aes(x = avg_trips_daily_wave_first
+        , y = avg_trips_daily_wave_second
+        , colour = bin_avg_total
+        )
+    ) + 
+  geom_point() +
+  scale_x_continuous(breaks = seq(0,50,5)) +
+  scale_y_continuous(breaks = seq(0,40,5)) 
+```
+
+Above 95% as outliers
+```{r}
+ub95 <- quantile(
+  df_outcome_trips$avg_trips_daily_total
+  , 0.95
+  )
+outlier95 <- which(df_outcome_trips$avg_trips_daily_total > ub95)
+
+ub99 <- quantile(df_outcome_trips$avg_trips_daily_total, 0.99)
+
+df_outcome_trips[outlier95]
+```
+
+
+
+## standard deviation
+
+CHECK STANDARD DEVIATION
+```{r}
+
+```
+
+
+## z scores
+
+CHECK LATER: non-parametrical statistical test for a left skewed distribution
+
+```{r}
+df_outcome_trips$z_avg_first <- scale(df_outcome_trips$avg_trips_daily_wave_first)
+# df_outcome_trips %>% 
+#   ggplot() +
+#   geom_histogram(aes(z_avg_first))
+
+summary(df_outcome_trips$z_avg_first)
+
+df_outcome_trips$z_avg_second <- scale(
+  df_outcome_trips$avg_trips_daily_wave_second
+  )
+```
+
+
+## hampel filter
+
+## mvoutlier package
+
+```{r}
+Y <- as.matrix(
+  df_outcome_trips[,c("avg_trips_daily_wave_first","avg_trips_daily_wave_second")]
+  )
+
+res <- mvoutlier::aq.plot(Y)
+```
+
+
+# Save data
+
+```{r}
+
+```
+
+
+
+
+# Filter by control/treatment
+
+Remove all observations that are NA on treatment
+```{r}
+df_tc <- df_both %>% filter(!is.na(treatment))
+```
+
+
+
+
 
 
 # Descriptive analysis
@@ -988,6 +1364,8 @@ df_outcomes <- dplyr::left_join(
 # treatment
 desc_age <- df_tc %>% 
   dplyr::filter(wave == "First") %>% 
+  
+  # CORRECT BELOW
   mutate(treatment = factor(
     treatment
     , levels = c(0L,1L)
@@ -996,25 +1374,23 @@ desc_age <- df_tc %>%
   select(
     # wave
     treatment
-    , age_groups_5_all
+    , age_groups_5_grouped
   # , visible_minority
   # , immigrant
   # , gender
   # , educ_has_postsec
 ) %>% 
   mutate(
-    age_groups_5_all = forcats::fct_drop(
-      age_groups_5_all
+    age_groups_5_grouped = forcats::fct_drop(
+      age_groups_5_grouped
       , only = c("age_50_54","age_55_59", "age_60_64")
       )
-    , age_groups_5_all = forcats::fct_recode(
-      age_groups_5_all
+    , age_groups_5_grouped = forcats::fct_recode(
+      age_groups_5_grouped
       , `Age 65-69` = "age_65_69"
       , `Age 70-74` = "age_70_74"
       , `Age 75-79` = "age_75_79"
-      , `Age 80-84` = "age_80_84"
-      , `Age 85-89` = "age_85_89"
-      , `Age 90 and over` = "age_90_over"
+      , `Age 80-84` = "age_80_over"
     )
   ) %>% 
     mutate(
@@ -1030,7 +1406,7 @@ desc_age <- df_tc %>%
     # , "Gender" = gender
     # , "Has post-secondary education" = educ_has_postsec
     , "Treatment" = treatment
-    , "Age groups (5 years intervals)" = age_groups_5_all
+    , "Age groups (5 years intervals)" = age_groups_5_grouped
   ) %>% 
       gtsummary::tbl_summary(
         type = gtsummary::all_dichotomous() ~ "categorical"
@@ -1250,253 +1626,6 @@ desc_outcomes <- df_outcomes %>%
 openxlsx::write.xlsx(desc_outcomes, "output/df_outcomes.xlsx")
 
 ```
-
-
-# DETECT OUTLIERS: travel behaviour
-
-https://trevorfrench.github.io/R-for-Data-Analysis/p3c3-outliers.html#density-plot
-https://statsandr.com/blog/outliers-detection-in-r/#z-scores
-
-## rationale
-questions: 
-q22
-q95
-q82
-q83
-q84
-q85
-q81
-q86
-q87
-q88
-q89
-q90
-q91
-q92
-q94
-q117
-
-Phrasing: `In the last seven days, how many times did you use < mode x > to travel to or from each of the following activities?`
-
-
-## reasonable number of trips per day
-Own example
-* Considering each leg of the trip as a trip:
-
-** Weekdays
-JP tuesday jan 28th
-University: 2 (1 going 1 back)
-Groceries: 2 (1 going 1 back)
-
-JP wednesday jan 29th
-University: 2 (1 going 1 back)
-Physiotherapy:  2 (1 going 1 back)
-
-If one needs only `2` trips (1 leg going, 1 back) to work + 1 extra activity every day (`2` trips = 1 going + 1 back), that would result in 4 trips on a regular/normal weekday.
-
-That would mean `4 x 5 (workdays) = 20 trips` on the weekdays
-
-On an exceptional day, that count could go up to 1 or 2 additional round trips (6 or 8)
-
-** Weekend
-1 trips on each day of the weekend (2 + 2) = 4
-
-** Total
-20 (weekdays) + 4 (weekends) = `24 trips on a week`, 
-meaning `24/7 = 3.4` trips daily
-
-
-* Considering both legs of the trip as single trip: 1/2 of the previous
-
-10 (weekdays) + 2 (weekends) = `12 trips on a week`, 
-meaning `12/7 = 1.7` trips daily
-
-
-### Literature
-
-CHECK HOW THESE STUDIES ESTIMATED/HOW THE QUESTION WAS ASKED
-
-Chudyk et al (2015): Vancouver: median 2.5 trips a day
-Dejoux et al (2010): MTL (projection based on 2005 census): 
-- 65-74: 2.17 (2006) and 3.01 (2021)
-- 75 and over: 1.44 (2006) and 1.98 (2021)
-
-COMPARE age groups
-50-64
-65-75
-75+ 
-
-COMBINE ABOVE 80
-
-## summary
-
-```{r}
-#| results: hold
-data.table::setDT(df_outcome_trips)
-
-# summary total
-summary(df_outcome_trips$avg_trips_daily_total)
-
-# summary by wave
-summary(df_outcome_trips$avg_trips_daily_wave_first)
-summary(df_outcome_trips$avg_trips_daily_wave_second)
-
-# summary by treatment
-df_outcome_trips[, as.list(summary(avg_trips_daily_wave_first)), by = "treatment"]
-df_outcome_trips[, as.list(summary(avg_trips_daily_wave_second)), by = "treatment"]
-
-# include demographics on outcomes
-df_outcome_trips <- df_outcome_trips %>% 
-  dplyr::left_join(
-    df_tc %>% 
-      filter(wave=="First") %>% 
-      select(response_id, age_groups_5_all)
-    , by = c("response_id")
-  )
-
-# summary by age group
-df_outcome_trips[
-  , as.list(summary(avg_trips_daily_wave_first)), by = "age_groups_5_all"
-  ]
-
-df_outcome_trips[
-  , as.list(summary(avg_trips_daily_wave_second)), by = "age_groups_5_all"
-  ]
-```
-
-## histogram
-
-```{r}
-df_tc %>%
-  ggplot(
-    aes(x=avg_trips_daily_wave)
-    ) +
-   geom_histogram(
-     binwidth = 1
-     ) +
-  facet_wrap(~wave)
-```
-
-
-## scatter plot
-
-```{r}
-df_outcome_trips %>% 
-  ggplot(aes(x = avg_trips_daily_wave_first, y =avg_trips_daily_wave_second)) + 
-  geom_point() +
-  scale_x_continuous(breaks = seq(0,50,5)) +
-  scale_y_continuous(breaks = seq(0,40,5))
-```
-
-
-## box plot
-
-by treatment and control
-```{r}
-df_tc %>%
-  ggplot(
-    aes(y=avg_trips_daily_wave, x = treatment, group = treatment)
-    ) +
-   geom_boxplot(
-     # position = "jitter"
-     ) +
-  # coord_flip() +
-  geom_jitter() +
-  facet_wrap(~wave) +
-  scale_x_continuous(breaks = seq(0,70,5))
-```
-
-by age group (5 age interval)
-
-```{r}
-df_tc %>%
-    ggplot(
-        aes(y=avg_trips_daily_wave, x = age_groups_5_all, group = age_groups_5_all)
-    ) +
-    geom_boxplot(
-        # position = "jitter"
-    ) +
-    # coord_flip() +
-    geom_jitter() +
-    facet_wrap(~wave) 
-```
-
-## quantiles
-
-```{r}
-quantiles <- quantile(
-  df_outcome_trips$avg_trips_daily_total
-  , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 0.99, 1L)
-  , na.rm = T
-  )
-df_outcome_trips$bin_avg_total <- cut(
-  df_outcome_trips$avg_trips_daily_total
-  , breaks = quantiles
-  )
-
-df_outcome_trips %>% count(bin_avg_total)
-```
-
-```{r}
-df_outcome_trips %>% 
-  ggplot(
-    aes(x = avg_trips_daily_wave_first
-        , y = avg_trips_daily_wave_second
-        , colour = bin_avg_total
-        )
-    ) + 
-  geom_point() +
-  scale_x_continuous(breaks = seq(0,50,5)) +
-  scale_y_continuous(breaks = seq(0,40,5)) 
-```
-
-Above 95% as outliers
-```{r}
-ub95 <- quantile(df_outcome_trips$avg_trips_daily_total, 0.95)
-outlier95 <- which(df_outcome_trips$avg_trips_daily_total > ub95)
-df_outcome_trips[outlier95]
-```
-
-
-
-## standard deviation
-
-CHECK STANDARD DEVIATION
-```{r}
-
-```
-
-
-## z scores
-
-CHECK LATER: non-parametrical statistical test for a left skewed distribution
-
-```{r}
-df_outcome_trips$z_avg_first <- scale(df_outcome_trips$avg_trips_daily_wave_first)
-# df_outcome_trips %>% 
-#   ggplot() +
-#   geom_histogram(aes(z_avg_first))
-
-summary(df_outcome_trips$z_avg_first)
-
-df_outcome_trips$z_avg_second <- scale(
-  df_outcome_trips$avg_trips_daily_wave_second
-  )
-```
-
-
-## hampel filter
-
-## mvoutlier package
-
-```{r}
-Y <- as.matrix(
-  df_outcome_trips[,c("avg_trips_daily_wave_first","avg_trips_daily_wave_second")]
-  )
-
-res <- mvoutlier::aq.plot(Y)
-```
-
 
 
 
@@ -1993,7 +2122,7 @@ df_model <- df_tc %>%
     , wave
     , treatment
     
-    , age_groups_5_all
+    , age_groups_5_grouped
     , visible_minority
     , immigrant
     , gender
@@ -2022,7 +2151,7 @@ model <- MASS::polr(
   data = df_model
   , delta_type ~
     treatment
-    # + age_groups_5_all
+    # + age_groups_5_grouped
     # + visible_minority
     # + immigrant
     # # + gender

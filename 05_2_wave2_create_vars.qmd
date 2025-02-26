@@ -19,6 +19,7 @@ library(DataExplorer)
 library(patchwork)
 library(mapview)
 library(rio)
+library(psych)
 ```
 
 ```{r}
@@ -345,12 +346,15 @@ df_wave1_only <- df_wave1_only %>%
       , .default = age_raw
     )
     # age categories
-    , age_groups_5 = as_factor(case_when(
+    , age_groups_5_grouped = as_factor(case_when(
       age_corrected < 50L ~ "age_less_50"
       , age_corrected >= 50L & age_corrected <= 54L ~ "age_50_54"
       , age_corrected >= 55L & age_corrected <= 59L ~ "age_55_59"
       , age_corrected >= 60L & age_corrected <= 64L ~ "age_60_64"
-      , age_corrected >= 65L ~ "age_65_over" 
+      , age_corrected >= 65L & age_corrected <= 69L ~ "age_65_69"
+      , age_corrected >= 70L & age_corrected <= 74L ~ "age_70_74"
+      , age_corrected >= 75L & age_corrected <= 79L ~ "age_75_79"
+      , age_corrected >= 80L ~ "age_80_over"
       , .default = NA_character_
     ))
     , age_groups_5_all = as_factor(case_when(
@@ -891,6 +895,25 @@ df_both <- df_both %>%
 ```
 
 
+### conbrach-alpha
+
+Check if activity participation variables can be grouped together
+
+Check if the variables can actually be grouped together -> cronbach alpha
+https://rforhr.com/cronbachsalpha.html
+
+Raw alpha of 0.85 suggest that it is above the threshold of internal consistency.
+Moreover, the alpha does not increase when dropping any of the variables (Reliability if an item is dropped), thus they seem to be consistent with one another.
+
+```{r}
+first <- df_both %>% 
+  filter(wave=="First") %>% 
+  select(q109_3:q109_5)
+
+# turn variables into numerical (so that the alpha funciton can run)
+psych::alpha(psych::char2numeric(first))
+
+```
 
 
 ### Cols from wave 2 only
@@ -1489,6 +1512,16 @@ lvls_suppressed_alt <- c(
 
 lvls_satisfied <- c("Satisfied", "Dissatisfied", "Neither")
 
+lvls_age_groups_grouped <- c(
+  "age_50_54"
+  , "age_55_59"
+  , "age_60_64"
+  , "age_65_69"
+  , "age_70_74"
+  , "age_75_79"  
+  , "age_80_over" 
+)
+
 lvls_age_groups_all <- c(
   "age_50_54"
   , "age_55_59"
@@ -1542,6 +1575,7 @@ df_both <- df_both %>%
     , employment = fct_relevel(employment, lvls_employment)
     , when_cost_transport_barrier = fct_relevel(when_cost_transport_barrier, lvls_when)
     , across(starts_with("^satisfaction"), ~fct_relevel(.x, lvls_satisfied))
+    , age_groups_5_grouped = fct_relevel(age_groups_5_grouped, lvls_age_groups_grouped)
     , age_groups_5_all = fct_relevel(age_groups_5_all, lvls_age_groups_all)
     , income_groups = fct_relevel(income_groups, lvls_income)
     , response_rate = fct_relevel(response_rate, lvls_response)

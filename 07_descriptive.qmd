@@ -1,0 +1,125 @@
+---
+title: "Mobilizing Justice: Montreal Fair Pass Pilot"
+author:
+  - name: João Pedro Figueira Amorim Parga
+    orcid: 0000-0002-4105-5927
+    email: joao.parga@mail.utoronto.ca
+    affiliations:
+      - name: Mobilizing Justice Partnership
+format:
+  docx: 
+    reference-doc: custom-reference-doc.docx
+    toc: false
+    toc-depth: 2
+    number-sections: true
+  html:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    number_sections: true
+    code_folding: hide
+    theme: readable
+    embed-resources: true
+  pdf:
+    fig-width: 6
+    fig-asp: 0.618
+    number-sections: true
+    colorlinks: true
+    keeptex: true
+    include-in-header: 
+      text: |
+        \usepackage{booktabs}
+        \usepackage{siunitx}
+        \newcolumntype{d}{S[
+            input-open-uncertainty=,
+            input-close-uncertainty=,
+            parse-numbers = false,
+            table-align-text-pre=false,
+            table-align-text-post=false
+         ]}
+date: "last-modified"
+date-format: '[This version:] MMMM D, YYYY'
+abstract: "This version contains only the updated tables and visualizations from the new report. The text can be found at the onedrive link."
+csl: csl/american-sociological-association.csl
+tbl-cap-location: top
+number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: false
+editor:
+  mode: source
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = FALSE)
+# Use cache = TRUE if you want to speed up compilation
+
+knitr::opts_knit$set(output.format = "html")  # Set to "html" for HTML output
+
+# A function to allow for showing some of the inline code
+rinline <- function(code){
+  html <- '<code  class="r">``` `r CODE` ```</code>'
+  sub("CODE", code, html)
+}
+```
+
+```{r packages}
+#| echo: false
+#| include: false
+library(tidyverse)
+library(sf)
+library(data.table)
+library(janitor)
+library(fs)
+library(cancensus)
+library(tmap)
+library(DataExplorer)
+library(patchwork)
+library(mapview)
+library(modelsummary)
+library(kableExtra)
+library(knitr)
+library(gt)
+library(gtsummary)
+library(conflicted)
+library(stars)
+library(showtext)
+library(sysfonts)
+library(hrbrthemes)
+library(flextable)
+library(rstatix)
+library(openxlsx)
+library(MASS)
+library(rcompanion)
+library(mvoutlier)
+library(psych)
+# library(Z.gtsummary.addons)
+
+`%nin%` = Negate(`%in%`)
+
+`%nlike%` = Negate(`%like%`)
+```
+
+```{r conflicts}
+#| include: false
+select <- dplyr::select
+conflicted::conflicts_prefer(dplyr::filter)
+```
+
+```{r fonts}
+#| include: false
+#| # use different fonts
+sysfonts::font_add_google("Roboto", "roboto")
+showtext::showtext_auto()
+```
+
+
+```{r}
+knitr::opts_chunk$set(tab.topcaption = TRUE)
+```
+
+
+# Read data
+
