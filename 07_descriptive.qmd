@@ -123,3 +123,1268 @@ knitr::opts_chunk$set(tab.topcaption = TRUE)
 
 # Read data
 
+```{r}
+load(file="data/df_both_outliers.RData")
+load(file="data/l_outcomes.RData")
+```
+
+# outliers
+
+## count outliers
+
+```{r}
+df_both_outliers %>% 
+  filter(!is.na(treatment)) %>% 
+  count(wave, outliers_95, treatment)
+```
+
+## remove outliers
+
+```{r}
+df_both <- df_both_outliers %>% 
+  filter(outliers_95 == "non_outlier")
+```
+
+```{r}
+l_outcomes <- l_outcomes %>% 
+  map(
+    ~ dplyr::left_join(
+      x = .x
+      , y = df_both %>% select(response_id, outliers_95)
+      , by = c("response_id")
+    )
+  ) 
+
+```
+
+
+
+Find *intersection* between non-outliers
+Individuals can be outliers in the first and/or second wave.
+We want to keep the same individuals in the two waves.
+Thus, we need to find the intersection of individuals who are not outliers in both waves.
+
+```{r}
+ids_non_out_first <- df_both %>% 
+  filter(wave=="First") %>% 
+  pull(response_id)
+
+ids_non_out_second <- df_both %>% 
+  filter(wave=="Second") %>% 
+  pull(response_id)
+
+ids_intersect <- base::intersect(ids_non_out_first
+                                 , ids_non_out_second)
+# filter on df_both
+df_both <- df_both %>% 
+  filter(response_id %in% ids_intersect)
+
+# filter on l_outcomes
+l_outcomes <- map(
+  .x = l_outcomes
+  , ~dplyr::filter(.data = .x, response_id %in% ids_intersect)
+)
+```
+
+
+
+# Filter treatment
+
+Remember: always include `filter(!is.na(treatment)) %>%` pipe before operations
+
+```{r}
+
+```
+
+# Descriptive statistics
+
+## Demographics
+
+### Constant
+
+```{r}
+t_age_treat <- df_both %>% 
+  filter(treatment=="Treatment" & wave =="First") %>%
+  select(treatment, age_groups_5_grouped) %>% 
+  # mutate(
+  #   age_groups_5_grouped = forcats::fct_drop(
+  #     age_groups_5_grouped
+  #     , only = c("age_50_54","age_55_59", "age_60_64")
+  #     )
+  # ) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+  tbl_summary(
+    by = treatment
+  )
+
+t_age_control_1 <- df_both %>% 
+  filter(treatment=="Control"  & wave =="First") %>%
+  select(treatment, age_groups_5_grouped) %>% 
+  
+  # mutate(
+  #   age_groups_5_grouped = forcats::fct_drop(
+  #     age_groups_5_grouped
+  #     , only = c("age_50_54","age_55_59", "age_60_64")
+  #     )
+  # ) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+  tbl_summary(
+    by = treatment
+  )
+
+t_age_control_2 <- df_both %>% 
+  filter(treatment_60_64=="Control" & wave =="First") %>% 
+  select(treatment_60_64, age_groups_5_grouped) %>% 
+  
+  # mutate(
+  #   age_groups_5_grouped = forcats::fct_drop(
+  #     age_groups_5_grouped
+  #     , only = c("age_50_54","age_55_59")
+  #     )
+  # ) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment_60_64")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+  tbl_summary(
+    by = treatment_60_64
+  )
+
+t_age_control_3 <- df_both %>% 
+  filter(treatment_50_64=="Control" & wave =="First") %>%
+  select(treatment_50_64, age_groups_5_grouped) %>% 
+   
+    mutate(
+    across(
+      .cols = -one_of("treatment_50_64")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+  tbl_summary(
+    by = treatment_50_64
+  )
+
+l_age <- list(
+  "t_age_treat" = t_age_treat
+  , "t_age_control_1" = t_age_control_1
+  , "t_age_control_2" = t_age_control_2
+  ,"t_age_control_3" = t_age_control_3
+)
+
+rm(t_age_treat,t_age_control_1,t_age_control_2,t_age_control_3)
+
+tbl_merge(
+  tbls = l_age
+  , tab_spanner = c(
+    "**Treatment: 65+ and pass**"
+    ,"**Control: 65+ and no pass**", "**Control: 60-64**", "**Control: 50-64**"
+    )
+)
+```
+
+
+```{r}
+t_demog_treatment <- df_both %>% 
+  mutate(
+    treatment = factor(treatment, levels = c("Treatment", "Control"))
+  ) %>% 
+  dplyr::filter(
+    wave == "First" &
+      !is.na(treatment)
+      # treatment=="Treatment"
+    ) %>% 
+  select(
+    # wave
+    treatment
+  , visible_minority
+  , immigrant
+  , gender
+  , educ_has_postsec
+) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          visible_minority ~ "frequency"
+          , immigrant ~ "frequency"
+          , gender ~ "frequency"
+          , educ_has_postsec ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "treatment"
+        # , statistic = all_categorical() ~ "{p}%"
+      ) 
+
+t_demog_control_2 <- df_both %>% 
+  dplyr::filter(
+    wave == "First" &
+      treatment_60_64=="Control"
+    ) %>% 
+  select(
+    # wave
+    treatment_60_64
+  , visible_minority
+  , immigrant
+  , gender
+  , educ_has_postsec
+) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment_60_64")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          visible_minority ~ "frequency"
+          , immigrant ~ "frequency"
+          , gender ~ "frequency"
+          , educ_has_postsec ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "treatment_60_64"
+        # , statistic = all_categorical() ~ "{p}%"
+      )
+
+t_demog_control_3 <- df_both %>% 
+  dplyr::filter(
+    wave == "First" &
+      treatment_50_64=="Control"
+    ) %>% 
+  select(
+    # wave
+    treatment_50_64
+  , visible_minority
+  , immigrant
+  , gender
+  , educ_has_postsec
+) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment_50_64")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          visible_minority ~ "frequency"
+          , immigrant ~ "frequency"
+          , gender ~ "frequency"
+          , educ_has_postsec ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "treatment_50_64"
+        # , statistic = all_categorical() ~ "{p}%"
+      ) 
+
+l_demog <- list(
+  "t_demog_treatment" = t_demog_treatment
+  , "t_demog_control_2" = t_demog_control_2
+  , "t_demog_control_3" = t_demog_control_3
+)
+
+rm(t_demog_treatment,t_demog_control_2,t_demog_control_3)
+
+tbl_merge(
+  tbls = l_demog
+  , tab_spanner = c(
+    "**Control: 65+ and no pass**","**Control: 60-64**", "**Control: 50-64**"
+    )
+) %>% 
+  gtsummary::modify_caption(caption = "Descriptive statistics: constant demographics")
+```
+
+
+### Time-variant
+
+```{r}
+t_variant_treatment <- df_both %>% 
+  mutate(
+    treatment = factor(treatment, levels = c("Treatment", "Control"))
+  ) %>% 
+  dplyr::filter(
+    wave == "First" &
+      !is.na(treatment)
+      # treatment=="Treatment"
+    ) %>% 
+  select(
+    # wave
+    treatment
+    , any_mobility_limitation
+    # , any_functional_limitation
+    , employment
+    , income_groups2
+    , in_lim
+    , has_vehicle_household
+) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          any_mobility_limitation ~ "frequency"
+          , employment ~ "frequency"
+          , income_groups2 ~ "frequency"
+          , in_lim ~ "frequency"
+          , has_vehicle_household ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = treatment
+        # , statistic = all_categorical() ~ "{p}%"
+      )
+
+t_variant_control_2 <- df_both %>% 
+  dplyr::filter(
+    wave == "First" &
+      treatment_60_64=="Control"
+    ) %>% 
+  select(
+    treatment_60_64
+    , any_mobility_limitation
+    , employment
+    , income_groups2
+    , in_lim
+    , has_vehicle_household
+) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment_60_64")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          any_mobility_limitation ~ "frequency"
+          , employment ~ "frequency"
+          , income_groups2 ~ "frequency"
+          , in_lim ~ "frequency"
+          , has_vehicle_household ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "treatment_60_64"
+        # , statistic = all_categorical() ~ "{p}%"
+      )
+
+t_variant_control_3 <- df_both %>% 
+  dplyr::filter(
+    wave == "First" &
+      treatment_50_64=="Control"
+    ) %>% 
+  select(
+    treatment_50_64
+    , any_mobility_limitation
+    , employment
+    , income_groups2
+    , in_lim
+    , has_vehicle_household
+) %>% 
+    mutate(
+    across(
+      .cols = -one_of("treatment_50_64")
+      # don't change fct below for newer one
+      , ~ forcats::fct_explicit_na(.x)
+      )
+  ) %>% 
+      gtsummary::tbl_summary(
+        type = gtsummary::all_dichotomous() ~ "categorical"
+        , sort = list(
+          any_mobility_limitation ~ "frequency"
+          , employment ~ "frequency"
+          , income_groups2 ~ "frequency"
+          , in_lim ~ "frequency"
+          , has_vehicle_household ~ "frequency"
+        )
+        # all_categorical() ~ "frequency"
+        # , missing = "always"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "treatment_50_64"
+        # , statistic = all_categorical() ~ "{p}%"
+      )
+
+
+
+l_variant <- list(
+  "t_variant_treatment" = t_variant_treatment
+  , "t_variant_control_2" = t_variant_control_2
+  , "t_variant_control_3" = t_variant_control_3
+)
+
+rm(t_variant_treatment,t_variant_control_2,t_variant_control_3)
+
+tbl_merge(
+  tbls = l_variant
+  , tab_spanner = c(
+    "**Control: 65+ and no pass**","**Control: 60-64**", "**Control: 50-64**"
+    )
+) %>% 
+  gtsummary::modify_caption(caption = "Descriptive statistics: time-variant demographics")
+
+```
+
+
+# Dependent
+
+## basic
+
+```{r}
+t_basic_treatment <- df_both %>% 
+    dplyr::filter(
+    treatment=="Treatment"
+    ) %>%
+  mutate(
+    treatment = factor(
+      treatment
+      , levels = c("Treatment", "Control")
+      , labels = c("Treatment","Control: 65+ and no pass")
+      )
+  ) %>% 
+  select(
+# controls
+    treatment
+    , wave
+# trip generation
+    , avg_trips_daily_wave
+    , count_trips_wave
+    , count_modes
+    , count_dest
+    , main_dest
+    , main_mode
+    , main_type
+# travel behavior
+    , rides_transit_as_would_like
+# satisfaction
+    # , q109_3:q109_5
+    , satisfaction_activity_participation
+    , satisfaction_seeing_friends_family
+    , satisfaction_recreation
+    , satisfaction_community_events
+# cost
+    , difficulty_transport_expenses
+    , has_cost_prevented_transit
+    # too few observations for treatment (not so for treatment 60-64)
+    , transit_barrier_cost_related
+    # not enough obs for treament, but might be different for others
+    , when_cost_transport_barrier
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+  # rename(
+  #   "50-64" = count_trips_wave
+  # ) %>% 
+  tbl_strata(
+    strata = treatment
+    , .tbl_fun = 
+      ~ .x %>% 
+      tbl_summary(
+        type = list(
+          count_trips_wave ~ "continuous"
+          , count_modes ~ "continuous"
+          , count_dest ~ "continuous"
+        )
+        # type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        ,  statistic = all_continuous() ~ c(
+      "{mean} ({sd})"
+      # ,"{median} ({p25}, {p75})"
+      )
+      , sort = list(
+        main_dest ~ "frequency"
+        , main_mode ~ "frequency"
+        , main_type ~ "frequency"
+      )
+      ) #%>% 
+      # add_n()
+  )
+
+t_basic_treatment_1 <- df_both %>% 
+    dplyr::filter(
+    treatment=="Control"
+    ) %>%
+  mutate(
+    treatment = factor(
+      treatment
+      , levels = c("Treatment", "Control")
+      , labels = c("Treatment","Control: 65+ and no pass")
+      )
+  ) %>% 
+  select(
+# controls
+    treatment
+    , wave
+# trip generation
+, avg_trips_daily_wave    
+, count_trips_wave
+    , count_modes
+    , count_dest
+    , main_dest
+    , main_mode
+    , main_type
+# travel behavior
+    , rides_transit_as_would_like
+# satisfaction
+    # , q109_3:q109_5
+    , satisfaction_activity_participation
+    , satisfaction_seeing_friends_family
+    , satisfaction_recreation
+    , satisfaction_community_events
+# cost
+    , difficulty_transport_expenses
+    , has_cost_prevented_transit
+    # too few observations for treatment (not so for treatment 60-64)
+    , transit_barrier_cost_related
+    # not enough obs for treament, but might be different for others
+    , when_cost_transport_barrier
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+  # rename(
+  #   "50-64" = count_trips_wave
+  # ) %>% 
+  tbl_strata(
+    strata = treatment
+    , .tbl_fun = 
+      ~ .x %>% 
+      tbl_summary(
+        type = list(
+          count_trips_wave ~ "continuous"
+          , count_modes ~ "continuous"
+          , count_dest ~ "continuous"
+        )
+        # type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        ,  statistic = all_continuous() ~ c(
+      "{mean} ({sd})"
+      # ,"{median} ({p25}, {p75})"
+      )
+      , sort = list(
+        main_dest ~ "frequency"
+        , main_mode ~ "frequency"
+        , main_type ~ "frequency"
+      )
+      ) #%>% 
+      # add_n()
+  )
+
+t_basic_treatment_2 <- df_both %>% 
+    dplyr::filter(
+    treatment_60_64=="Control"
+    ) %>% 
+  mutate(
+    treatment_60_64 = factor(
+      treatment_60_64
+      , levels = c("Treatment", "Control")
+      , labels = c("Treatment","Control: 60-64")
+      )
+  ) %>% 
+  select(
+# controls
+    treatment_60_64
+    , wave
+# trip generation
+, avg_trips_daily_wave    
+, count_trips_wave
+    , count_modes
+    , count_dest
+    , main_dest
+    , main_mode
+    , main_type
+# travel behavior
+    , rides_transit_as_would_like
+# satisfaction
+    # , q109_3:q109_5
+    , satisfaction_activity_participation
+    , satisfaction_seeing_friends_family
+    , satisfaction_recreation
+    , satisfaction_community_events
+# cost
+    , difficulty_transport_expenses
+    , has_cost_prevented_transit
+    # too few observations for treatment (not so for treatment 60-64)
+    , transit_barrier_cost_related
+    # not enough obs for treament, but might be different for others
+    , when_cost_transport_barrier
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+  # rename(
+  #   "50-64" = count_trips_wave
+  # ) %>% 
+  tbl_strata(
+    strata = treatment_60_64
+    , .tbl_fun = 
+      ~ .x %>% 
+      tbl_summary(
+        type = list(
+          count_trips_wave ~ "continuous"
+          , count_modes ~ "continuous"
+          , count_dest ~ "continuous"
+        )
+        # type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        ,  statistic = all_continuous() ~ c(
+      "{mean} ({sd})"
+      # ,"{median} ({p25}, {p75})"
+      )
+      , sort = list(
+        main_dest ~ "frequency"
+        , main_mode ~ "frequency"
+        , main_type ~ "frequency"
+      )
+      ) #%>% 
+      # add_n()
+  )
+
+t_basic_treatment_3 <- df_both %>% 
+    dplyr::filter(
+    treatment_50_64=="Control"
+    ) %>% 
+  mutate(
+    treatment_50_64 = factor(
+      treatment_50_64
+      , levels = c("Treatment", "Control")
+      , labels = c("Treatment","Control: 50-64")
+      )
+  ) %>% 
+  select(
+# controls
+    treatment_50_64
+    , wave
+# trip generation
+, avg_trips_daily_wave    
+, count_trips_wave
+    , count_modes
+    , count_dest
+    , main_dest
+    , main_mode
+    , main_type
+# travel behavior
+    , rides_transit_as_would_like
+# satisfaction
+    # , q109_3:q109_5
+    , satisfaction_activity_participation
+    , satisfaction_seeing_friends_family
+    , satisfaction_recreation
+    , satisfaction_community_events
+# cost
+    , difficulty_transport_expenses
+    , has_cost_prevented_transit
+    # too few observations for treatment (not so for treatment 60-64)
+    , transit_barrier_cost_related
+    # not enough obs for treament, but might be different for others
+    , when_cost_transport_barrier
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+  # rename(
+  #   "50-64" = count_trips_wave
+  # ) %>% 
+  tbl_strata(
+    strata = treatment_50_64
+    , .tbl_fun = 
+      ~ .x %>% 
+      tbl_summary(
+        type = list(
+          count_trips_wave ~ "continuous"
+          , count_modes ~ "continuous"
+          , count_dest ~ "continuous"
+        )
+        # type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        ,  statistic = all_continuous() ~ c(
+      "{mean} ({sd})"
+      # ,"{median} ({p25}, {p75})"
+      )
+      , sort = list(
+        main_dest ~ "frequency"
+        , main_mode ~ "frequency"
+        , main_type ~ "frequency"
+      )
+      ) #%>% 
+      # add_n()
+  )
+
+l_trips_basic <- list(
+  "t_basic_treatment" = t_basic_treatment
+  , "t_basic_treatment_1" = t_basic_treatment_1
+  , "t_basic_treatment_2" = t_basic_treatment_2
+  , "t_basic_treatment_3" = t_basic_treatment_3
+)
+
+rm(t_basic_treatment, t_basic_treatment_1,t_basic_treatment_2,t_basic_treatment_3)
+
+
+tbl_merge(
+  tbls = l_trips_basic
+  , tab_spanner = c(
+    "**Treatment: 65+ and pass**"
+    , "**Control: 65+ and no pass**","**Control: 60-64**", "**Control: 50-64**"
+    )
+)
+
+```
+
+
+## trip generation
+
+Average number of trips per age vs distance to threshold
+
+*50-64 threshold*
+
+```{r}
+df_both %>% 
+  filter(!is.na(treatment_50_64)) %>%
+  group_by(age_corrected, wave, treatment_50_64) %>%
+  summarise(avg_trips_age = mean(count_trips_wave, na.rm = T)) %>% 
+  mutate(
+    age_distance_threshold = case_when(
+      is.na(age_corrected) ~ NA_integer_
+      , .default = age_corrected - 65L
+    )
+  )  %>% 
+  ggplot(
+    aes(
+      x = age_distance_threshold
+      , y = avg_trips_age
+      , colour = treatment_50_64
+      , group = treatment_50_64
+      )
+  ) + 
+  geom_point() +
+  geom_smooth() +
+  geom_vline(
+    xintercept = 0L
+    , linetype = "dashed"
+    , alpha = 0.7
+    ) + 
+  facet_wrap(~wave)
+```
+
+
+Average number of modes per age vs distance to threshold
+
+*50-64 threshold*
+
+```{r}
+df_both %>% 
+  filter(!is.na(treatment_50_64)) %>%
+  group_by(age_corrected, wave, treatment_50_64) %>%
+  summarise(avg_modes_age = mean(count_modes, na.rm = T)) %>% 
+  mutate(
+    age_distance_threshold = case_when(
+      is.na(age_corrected) ~ NA_integer_
+      , .default = age_corrected - 65L
+    )
+  )  %>% 
+  ggplot(
+    aes(
+      x = age_distance_threshold
+      , y = avg_modes_age
+      , colour = treatment_50_64
+      , group = treatment_50_64
+      )
+  ) + 
+  geom_point() +
+  geom_smooth() +
+  geom_vline(
+    xintercept = 0L
+    , linetype = "dashed"
+    , alpha = 0.7
+    ) + 
+  facet_wrap(~wave)
+```
+
+Average number of `dest` per age vs distance to threshold
+
+*50-64 threshold*
+
+```{r}
+df_both %>% 
+  filter(!is.na(treatment_50_64)) %>%
+  group_by(age_corrected, wave, treatment_50_64) %>%
+  summarise(avg_dest_age = mean(count_dest, na.rm = T)) %>% 
+  mutate(
+    age_distance_threshold = case_when(
+      is.na(age_corrected) ~ NA_integer_
+      , .default = age_corrected - 65L
+    )
+  )  %>% 
+  ggplot(
+    aes(
+      x = age_distance_threshold
+      , y = avg_dest_age
+      , colour = treatment_50_64
+      , group = treatment_50_64
+      )
+  ) + 
+  geom_point() +
+  geom_smooth() +
+  geom_vline(
+    xintercept = 0L
+    , linetype = "dashed"
+    , alpha = 0.7
+    ) + 
+  facet_wrap(~wave)
+```
+
+
+---
+
+
+The two tables below show the same information but in different format.
+Needs refining.
+
+*Mean trips: treatment repeats in column*
+
+
+```{r}
+t_trips_1 <- df_both %>% 
+  dplyr::filter(
+    !is.na(treatment)
+    ) %>%
+  select(
+    treatment
+    , wave
+    , count_trips_wave
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+  rename(
+    "65+ and no pass" = count_trips_wave
+  ) %>% 
+  tbl_strata(
+    strata = treatment
+    , .tbl_fun = 
+      ~ .x %>% 
+      tbl_summary(
+        type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        ,  statistic = all_continuous() ~ c(
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})"
+      )
+      ) %>% 
+      add_n() %>% 
+      modify_header(
+        all_stat_cols() ~ "**{level}**"
+        , label = "**Control**"
+        )
+  )
+
+t_trips_2 <- df_both %>% 
+  dplyr::filter(
+    !is.na(treatment_60_64)
+    ) %>%
+  select(
+    treatment_60_64
+    , wave
+    , count_trips_wave
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+    rename(
+    "60-64" = count_trips_wave
+  ) %>% 
+  tbl_strata(
+    strata = treatment_60_64
+    , .tbl_fun = 
+      ~ .x %>% 
+      tbl_summary(
+        type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        ,  statistic = all_continuous() ~ c(
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})"
+      )
+      ) %>% 
+      add_n()
+  )
+      
+t_trips_3 <- df_both %>% 
+  dplyr::filter(
+    !is.na(treatment_50_64)
+    ) %>%
+  select(
+    treatment_50_64
+    , wave
+    , count_trips_wave
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+  rename(
+    "50-64" = count_trips_wave
+  ) %>% 
+  tbl_strata(
+    strata = treatment_50_64
+    , .tbl_fun = 
+      ~ .x %>% 
+      tbl_summary(
+        type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        ,  statistic = all_continuous() ~ c(
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})"
+      )
+      ) %>% 
+      add_n()
+  )
+
+l_trips <- list(
+  "t_trips_1" = t_trips_1
+  , "t_trips_2" = t_trips_2
+  , "t_trips_3" = t_trips_3
+)
+
+rm(t_trips_1,t_trips_2,t_trips_3)
+
+tbl_stack(l_trips)
+
+```
+
+```{r new}
+# t_trips_1 <- df_both %>% 
+#   dplyr::filter(
+#     !is.na(treatment)
+#     ) %>%
+#     mutate(
+#     treatment = factor(treatment, levels = c("Treatment", "Control"))
+#   ) %>% 
+#   select(
+#     treatment
+#     , wave
+#     , count_trips_wave
+# ) %>% 
+#   #   mutate(
+#   #   across(
+#   #     .cols = -one_of("treatment_50_64")
+#   #     # don't change fct below for newer one
+#   #     , ~ forcats::fct_explicit_na(.x)
+#   #     )
+#   # ) %>% 
+#   rename(
+#     "65+ and pass" = count_trips_wave
+#   ) %>% 
+#   tbl_strata(
+#     strata = treatment
+#     , .tbl_fun = 
+#       ~ .x %>% 
+#       tbl_summary(
+#         type = gtsummary::all_continuous() ~ "continuous2"
+#         , missing_text = "Missing"
+#         , missing_stat = "{p_miss}%"
+#         , by = "wave"
+#         ,  statistic = all_continuous() ~ c(
+#       "{mean} ({sd})",
+#       "{median} ({p25}, {p75})"
+#       )
+#       ) %>% 
+#       add_n() #%>% 
+#       # modify_header(
+#       #   all_stat_cols() ~ "**{level}**"
+#       #   , label = "**Control**"
+#       #   )
+#   )
+
+# treatment
+t_trips <- df_both %>% 
+  dplyr::filter(
+    treatment == "Treatment"
+    ) %>%
+  select(
+    # treatment_60_64
+    , wave
+    , count_trips_wave
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+    rename(
+    "65+ and pass" = count_trips_wave
+  ) %>% 
+  tbl_summary(
+        type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        , statistic = all_continuous() ~ c(
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})"
+      )
+      ) 
+
+t_trips_1 <- df_both %>% 
+  dplyr::filter(
+    treatment == "Control"
+    ) %>%
+  select(
+    # treatment_60_64
+    , wave
+    , count_trips_wave
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+    rename(
+    "65+ and no pass" = count_trips_wave
+  ) %>% 
+  tbl_summary(
+        type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        , statistic = all_continuous() ~ c(
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})"
+      )
+      )
+
+t_trips_2 <- df_both %>% 
+  dplyr::filter(
+    treatment_60_64 == "Control"
+    ) %>%
+  select(
+    # treatment_60_64
+    , wave
+    , count_trips_wave
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+    rename(
+    "60-64" = count_trips_wave
+  ) %>% 
+  tbl_summary(
+        type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        , statistic = all_continuous() ~ c(
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})"
+      )
+      ) 
+
+t_trips_3 <- df_both %>% 
+  dplyr::filter(
+    treatment_50_64 == "Control"
+    ) %>%
+  select(
+    # treatment_60_64
+    , wave
+    , count_trips_wave
+) %>% 
+  #   mutate(
+  #   across(
+  #     .cols = -one_of("treatment_50_64")
+  #     # don't change fct below for newer one
+  #     , ~ forcats::fct_explicit_na(.x)
+  #     )
+  # ) %>% 
+    rename(
+    "50-64" = count_trips_wave
+  ) %>% 
+  tbl_summary(
+        type = gtsummary::all_continuous() ~ "continuous2"
+        , missing_text = "Missing"
+        , missing_stat = "{p_miss}%"
+        , by = "wave"
+        , statistic = all_continuous() ~ c(
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})"
+      )
+      ) 
+
+
+l_trips_v2 <- list(
+  "t_trips" = t_trips
+  ,"t_trips_1" = t_trips_1
+  , "t_trips_2" = t_trips_2
+  , "t_trips_3" = t_trips_3
+)
+
+tbl_merge(
+  tbls = l_trips_v2
+  , tab_spanner = c(
+    "**Treatment: 65+ and pass**"
+    , "**Control: 65+ and no pass**","**Control: 60-64**", "**Control: 50-64**"
+    )
+)
+
+```
+
+
+riders enough transit:
+```{r}
+# fisher test (2x2)
+stats::fisher.test(
+  df_outcome_cost$treatment
+  , df_outcome_cost$delta_rides_enough_transit
+)
+
+stats::fisher.test(
+  df_outcome_cost$treatment
+  , df_outcome_cost$delta_rides_enough_transit
+)
+
+rstatix::cramer_v(
+  df_outcome_cost$treatment
+  , df_outcome_cost$delta_rides_enough_transit
+)
+# post-hoc test: assess if the differences between levels was significant
+rstatix::pairwise_fisher_test(
+  xtab = table(
+    df_outcome_cost$treatment
+    ,df_outcome_cost$delta_rides_enough_transit
+    )
+  , p.adjust.method = "bonferroni"
+)
+
+```
+
+
+## cost
+
+```{r}
+
+```
+
+
+## activity participation
+
+### conbrach-alpha
+
+Check if activity participation variables can be grouped together
+
+Check if the variables can actually be grouped together -> cronbach alpha
+https://rforhr.com/cronbachsalpha.html
+
+Raw alpha of 0.85 suggest that it is above the threshold of internal consistency.
+Moreover, the alpha does not increase when dropping any of the variables (Reliability if an item is dropped), thus they seem to be consistent with one another.
+
+```{r}
+first <- df_both %>% 
+  filter(wave=="First") %>% 
+  select(q109_3:q109_5)
+
+# turn variables into numerical (so that the alpha funciton can run)
+psych::alpha(psych::char2numeric(first))
+
+```
+
+### Mann-Whitney test
+
+https://guides.library.lincoln.ac.uk/mash/mann_whitney_R
+
+```{r}
+
+```
+

@@ -378,6 +378,10 @@ df_wave1_only <- df_wave1_only %>%
       , q40 == "Prefer not to answer" & q4 == "65 and older" ~ "65+"
       , .default = NA_character_
     )
+    , age_distance_threshold = case_when(
+      is.na(age_corrected) ~ NA_integer_
+      , .default = age_corrected - 65L
+    )
     
     # visible minority 
     # https://www23.statcan.gc.ca/imdb/p3Var.pl?Function=DECI&Id=257515

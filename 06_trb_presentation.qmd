@@ -1057,6 +1057,13 @@ df_outcomes <- dplyr::left_join(
     , by = c("response_id")
   )
 
+l_outcomes <- list(
+  "df_outcome_cost" = df_outcome_cost
+  , "df_outcome_main" = df_outcome_main
+  , "df_outcome_participation" = df_outcome_participation
+  , "df_outcome_trips" = df_outcome_trips
+  , "df_outcomes" = df_outcomes
+)
 ```
 
 
@@ -1237,35 +1244,76 @@ df_both %>%
 ## quantiles
 
 ```{r}
-#| results: hold
-quantiles_first <- quantile(
+
+# quantiles_first <- quantile(
+#   df_outcome_trips %>% 
+#     filter(!is.na(treatment)) %>% 
+#     pull(avg_trips_daily_wave_first)
+#   , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 0.99, 1L)
+#   , na.rm = T
+#   )
+# quantiles_second <- quantile(
+#   df_outcome_trips %>% 
+#     filter(!is.na(treatment)) %>% 
+#     pull(avg_trips_daily_wave_second)
+#   , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 0.99, 1L)
+#   , na.rm = T
+#   )
+
+quantiles <- quantile(
   df_outcome_trips %>% 
-    filter(!is.na(treatment)) %>% 
-    pull(avg_trips_daily_wave_first)
+    # filter(!is.na(treatment)) %>% 
+    pull(avg_trips_daily_total)
   , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 0.99, 1L)
   , na.rm = T
   )
-quantiles_second <- quantile(
-  df_outcome_trips %>% 
-    filter(!is.na(treatment)) %>% 
-    pull(avg_trips_daily_wave_second)
-  , probs = c(0L, 0.25, 0.5, 0.75, 0.95, 0.99, 1L)
-  , na.rm = T
+
+df_outcome_trips$bin_avg_total <- cut(
+  df_outcome_trips$avg_trips_daily_total
+  , breaks = quantiles
   )
 
-df_outcome_trips$bin_avg_first <- cut(
-  df_outcome_trips$avg_trips_daily_wave_first
-  , breaks = quantiles_first
-  )
+# df_outcome_trips$bin_avg_first <- cut(
+#   df_outcome_trips$avg_trips_daily_wave_first
+#   , breaks = quantiles_first
+#   )
+# 
+# df_outcome_trips$bin_avg_second <- cut(
+#   df_outcome_trips$avg_trips_daily_wave_second
+#   , breaks = quantiles_second
+#   )
 
-df_outcome_trips$bin_avg_second <- cut(
-  df_outcome_trips$avg_trips_daily_wave_second
-  , breaks = quantiles_second
-  )
-
-df_outcome_trips %>% count(bin_avg_first)
-df_outcome_trips %>% count(bin_avg_second)
+df_outcome_trips %>% count(bin_avg_total)
+# df_outcome_trips %>% count(bin_avg_first)
+# df_outcome_trips %>% count(bin_avg_second)
 ```
+
+
+
+```{r}
+df_both_outliers <- df_both %>% 
+  mutate(
+    outliers_95 = case_when(
+      avg_trips_daily_wave > 10 &
+        wave == "First" ~ "outlier_first"
+      , avg_trips_daily_wave > 10 &
+        wave == "Second" ~ "outlier_second"
+      , is.na(avg_trips_daily_wave) &
+        wave == "First" ~ NA_character_
+      , is.na(avg_trips_daily_wave) &
+        wave == "Second" ~ NA_character_
+      , .default = "non_outlier"
+    )
+  )
+
+
+```
+
+
+For the complete sample, the 95% quartile equals 9.56 average trips daily (considering both waves, i.e., sum(trips_counts) / 14 days). Rounding up, that's 10 trips daily.
+
+*THE OUTLIERS THRESHOLD: 10*
+
 
 ```{r}
 df_outcome_trips %>% 
@@ -1280,21 +1328,6 @@ df_outcome_trips %>%
   scale_x_continuous(breaks = seq(0,50,5)) +
   scale_y_continuous(breaks = seq(0,40,5)) 
 ```
-
-Above 95% as outliers
-```{r}
-ub95 <- quantile(
-  df_outcome_trips$avg_trips_daily_total
-  , 0.95
-  )
-outlier95 <- which(df_outcome_trips$avg_trips_daily_total > ub95)
-
-ub99 <- quantile(df_outcome_trips$avg_trips_daily_total, 0.99)
-
-df_outcome_trips[outlier95]
-```
-
-
 
 ## standard deviation
 
@@ -1335,10 +1368,11 @@ res <- mvoutlier::aq.plot(Y)
 ```
 
 
-# Save data
+# SAVE DATA
 
 ```{r}
-
+save(df_both_outliers, file = "data/df_both_outliers.RData")
+save(l_outcomes, file = "data/l_outcomes.RData")
 ```
 
 
@@ -1350,9 +1384,6 @@ Remove all observations that are NA on treatment
 ```{r}
 df_tc <- df_both %>% filter(!is.na(treatment))
 ```
-
-
-
 
 
 
