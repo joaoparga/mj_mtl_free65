@@ -20,6 +20,7 @@ library(patchwork)
 library(mapview)
 library(rio)
 library(psych)
+library(openxlsx2)
 ```
 
 ```{r}
@@ -64,6 +65,12 @@ df_montreal <- data.table::fread("data/MontrealRawData_2023_08_24.csv") %>%
 <!-- montreal_split <- sf::st_read("data/montreal_split/RA_CBC_EOD18.shp") %>%  -->
 <!--   janitor::clean_names() -->
 <!-- ``` -->
+
+## LIM data
+```{r}
+load("data/statscan_lim_threshold/statscan_limthreshold_formatted.RData")
+```
+
 
 ## Filter data
 
@@ -487,62 +494,217 @@ df_both <- df_both %>%
 ```
 
 
+
+```{r newincome}
+# create variable with separators
+df_both <- df_both %>% 
+  mutate(
+    income_groups = case_when(
+      q31== "I prefer not to answer" ~ NA_character_
+      , .default = str_trim(q31)
+    )
+    , income_2 = case_when(
+      income_groups == "Less than $15,000" ~ "$0-$14999"
+      , .default = income_groups
+    )
+  )
+
+df_both <- df_both %>% 
+  mutate(
+    income_2 = income_2 %>% 
+      str_replace(pattern = " to ", "-") %>% 
+      str_trim()
+  )
+
+# remove commas
+df_both <- df_both %>% 
+  mutate(
+    income_2 = income_2 %>% 
+      str_remove(",")
+  )
+
+df_both <- df_both %>% 
+  mutate(
+    income_2 = income_2 %>% 
+      str_remove(",")
+  )
+
+# lower and upper range
+## lower
+lower <- df_both$income_2 %>% 
+  unique() %>% 
+  str_extract("\\$[[:digit:]]{1,6}") %>% 
+  str_remove("\\$") %>% 
+  discard(is.na) %>% 
+  as.numeric() %>% 
+  sort()
+## upper
+upper <- df_both$income_2 %>% 
+  unique() %>% 
+  str_extract("[[:digit:]]{1,6}$") %>% 
+  discard(is.na) %>% 
+  as.numeric() %>% 
+  sort()
+
+# append last value from lower
+upper <- c(upper,lower[length(lower)])
+
+
+# include column with lower and upper end to categorize
+vec_income <- df_both$income_2 %>% unique()
+
+df_both <- df_both %>% 
+  mutate(
+    income_2 = case_when(
+      income_2 == "$210000 or more" ~ "$210000-$210000"
+      , .default = income_2
+    )
+  )
+
+# create lower and upper columns
+df_both <- df_both %>% 
+  mutate(
+    lower_range = income_2 %>% 
+    str_extract("\\$[[:digit:]]{1,6}") %>% 
+    str_remove("\\$") %>% 
+    as.numeric()
+    
+    , upper_range = income_2 %>% 
+    str_extract("[[:digit:]]{1,6}$") %>% 
+    as.numeric()
+  )
+
+# household size
+df_both <- df_both %>% 
+  mutate(
+    # household size
+    , household_size = case_when(
+      q106 == "1" ~ 1L
+      , q106 == "2" ~ 2L
+      , q106 == "3" ~ 3L
+      , q106 == "4" ~ 4L
+      , q106 == "5" ~ 5L
+      , q106 == "6" ~ 6L
+      , q106 == "7" ~ 7L
+      , q106 == "8" ~ 8L
+      , q106 == "9" ~ 9L
+      , q106 == "10 or more" ~ 10L
+      , .default = NA_integer_
+    )
+  )
+
+# left join cutoff
+df_both <- df_both %>% 
+  dplyr::left_join(
+    df_lim %>% select(household_size,lim_cutoff)
+    , by = "household_size"
+  )
+
+# income midpoint
+df_both <- df_both %>% 
+  mutate(
+    income_midpoint = round(
+      (lower_range + upper_range) / 2, digits = 0)
+    ) %>% 
+  relocate(income_midpoint, .before = upper_range)
+
+# classify
+df_both <- df_both %>% 
+  mutate(
+    below_lim_midpoint = case_when(
+      # is.na(household_size) ~ NA_character_
+      # , is.na(income_2) ~ NA_character_
+      
+       lower_range > lim_cutoff ~ "No"
+      
+      , upper_range < lim_cutoff ~ "Yes"      
+      
+      , lower_range <= lim_cutoff &
+        upper_range >= lim_cutoff ~ "midpoint"
+      
+      # lim_cutoff < lower_range ~ "no"
+      # 
+      # , lim_cutoff >= lower_range & 
+      #   lim_cutoff <= upper_range ~ "midpoint"
+      # 
+      # , lim_cutoff > lower_range
+      , .default = NA_character_
+    )
+  )
+
+df_both <- df_both %>% 
+  mutate(
+    in_lim = as_factor(case_when(
+      
+      below_lim_midpoint == "midpoint" &
+        income_midpoint <= lim_cutoff ~ "Yes"
+      
+      , below_lim_midpoint == "midpoint" &
+        income_midpoint > lim_cutoff ~ "No"
+      
+      , .default = below_lim_midpoint
+      
+    ))
+  )
+
+# df_both <- df_both %>% 
+#   mutate(in_lim = factor(in_lim, levels = c("No", "Yes")))
+
+```
+
+
+OLD LIM INCORRECT (ONLY DONE VIA MIDPOINT)
+
+<!-- ```{r lim_variables} -->
+<!-- df_both <- df_both %>%  -->
+<!--   mutate( -->
+<!--     income_groups = as_factor(case_when( -->
+<!--       q31 == "I prefer not to answer" ~ NA_character_ -->
+<!--       , .default = str_trim(q31) -->
+<!--     )) -->
+<!--     # income midpoint -->
+<!--     ,income_midpoint = case_when( -->
+<!--       q31 == "Less than $15,000" ~ 15000/2 -->
+<!--       , q31 == "$15,000 to $29,999 " ~ (15000 + 30000)/2 -->
+<!--       , q31 == "$30,000 to $59,999" ~ (30000 + 60000)/2 -->
+<!--       , q31 == "$60,000 to $89,999 " ~ (60000 + 90000)/2 -->
+<!--       , q31 == "$90,000 to $119,999 " ~ (90000 + 120000)/2 -->
+<!--       , q31 == "$120,000 to $149,999 " ~ (120000 + 150000)/2 -->
+<!--       , q31 == "$150,000 to $179,999 " ~ (150000 + 180000)/2 -->
+<!--       , q31 == "$180,000 to $209,999 " ~ (180000 + 210000)/2 -->
+<!--       , q31 == "$210,000 or more" ~ 210000 -->
+<!--       , .default = NA_integer_ -->
+<!--     ) -->
+<!--     # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4 -->
+<!--     # before tax threshold -->
+<!--     , lim_threshold = case_when( -->
+<!--       household_size == 1L ~ 30401 -->
+<!--       , household_size == 2L ~ 42993 -->
+<!--       , household_size == 3L ~ 52655 -->
+<!--       , household_size == 4L ~ 60801 -->
+<!--       , household_size == 5L ~ 67978 -->
+<!--       , household_size == 6L ~ 74466 -->
+<!--       , household_size == 8L ~ 85987 -->
+<!--       , household_size == 10L ~ 96136 -->
+<!--       , .default = NA_integer_ -->
+<!--     ) -->
+<!--     # in lim -->
+<!--     # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4 -->
+<!--     , in_lim = as_factor(case_when( -->
+<!--       income_midpoint < lim_threshold ~ "Yes" -->
+<!--       , income_midpoint >= lim_threshold ~ "No" -->
+<!--       , .default = NA_character_ -->
+<!--     )) -->
+<!--   ) -->
+<!-- ``` -->
+
+
 ```{r createvarsdemographics}
 
 
 df_both <- df_both %>% 
   mutate(
-    income_groups = as_factor(case_when(
-      q31 == "I prefer not to answer" ~ NA_character_
-      , .default = str_trim(q31)
-    ))
-    # income midpoint
-    ,income_midpoint = case_when(
-      q31 == "Less than $15,000" ~ 15000/2
-      , q31 == "$15,000 to $29,999 " ~ (15000 + 30000)/2
-      , q31 == "$30,000 to $59,999" ~ (30000 + 60000)/2
-      , q31 == "$60,000 to $89,999 " ~ (60000 + 90000)/2
-      , q31 == "$90,000 to $119,999 " ~ (90000 + 120000)/2
-      , q31 == "$120,000 to $149,999 " ~ (120000 + 150000)/2
-      , q31 == "$150,000 to $179,999 " ~ (150000 + 180000)/2
-      , q31 == "$180,000 to $209,999 " ~ (180000 + 210000)/2
-      , q31 == "$210,000 or more" ~ 210000
-      , .default = NA_integer_
-    )
-    # household size
-    , household_size = case_when(
-      q106 == "1" ~ 1
-      , q106 == "2" ~ 2
-      , q106 == "3" ~ 3
-      , q106 == "4" ~ 4
-      , q106 == "5" ~ 5
-      , q106 == "6" ~ 6
-      , q106 == "8" ~ 8
-      , q106 == "10 or more" ~ 10
-      , .default = NA_integer_
-    )
-    # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
-    # before tax threshold
-    , lim_threshold = case_when(
-      household_size == 1L ~ 30401
-      , household_size == 2L ~ 42993
-      , household_size == 3L ~ 52655
-      , household_size == 4L ~ 60801
-      , household_size == 5L ~ 67978
-      , household_size == 6L ~ 74466
-      , household_size == 8L ~ 85987
-      , household_size == 10L ~ 96136
-      , .default = NA_integer_
-    )
-    # in lim
-    # https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=t2_4
-    , in_lim = as_factor(case_when(
-      income_midpoint < lim_threshold ~ "Yes"
-      , income_midpoint >= lim_threshold ~ "No"
-      , .default = NA_character_
-    ))
-    
-    , vehicles_per_capita = case_when(
+    vehicles_per_capita = case_when(
       q39 == "0" ~ 0
       , q39 == "1" ~ 1/household_size
       , q39 == "2" ~ 2/household_size
@@ -609,6 +771,8 @@ df_both <- df_both %>%
   )
 
 ```
+
+
 
 
 
