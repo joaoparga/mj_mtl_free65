@@ -144,9 +144,12 @@ df_attrition <- df_full %>%
 ```
 
 
-Create new income groups by grouping original ones
+Create new in
 
+FIX BELOW BASED ON NEW CREATE VARS
 ```{r group income groups}
+66666666 ERROR!
+  
 df_attrition <- df_attrition %>% 
   mutate(
     income_groups2 = case_when(
