@@ -146,10 +146,7 @@ df_attrition <- df_full %>%
 
 Create new in
 
-FIX BELOW BASED ON NEW CREATE VARS
 ```{r group income groups}
-66666666 ERROR!
-  
 df_attrition <- df_attrition %>% 
   mutate(
     income_groups2 = case_when(
@@ -329,6 +326,13 @@ rm(df_first, df_second)
 
 ### option 3
 
+!
+BELOW: CHANGE 50-64 TO 50-59
+!
+
+
+
+
 - treatment: 65+ + t1_pass
 - control: 50-64 (t1_nopass -> remove 50-64 with pass)
 
@@ -338,11 +342,11 @@ FOR NOW: REMOVE 50-64 WHO DECLARED HAVING A PASS ON T1
 df_second <- df_both %>% 
   filter(wave == "Second") %>% 
   mutate(
-    treatment_50_64 = case_when(
+    treatment_50_59 = case_when(
       age_corrected >= 65L & has_free_pass_wave2 == "Yes" ~ "Treatment"
       
       , age_corrected >= 50L &
-        age_corrected <= 64L &
+        age_corrected < 59L &
         has_free_pass_wave2 == "No" ~ "Control"
       
       , .default = NA_character_
@@ -351,11 +355,11 @@ df_second <- df_both %>%
 
 df_first <- df_both %>% 
   filter(wave=="First") %>% 
-  mutate(treatment_50_64 = case_when(
+  mutate(treatment_50_59 = case_when(
     
-    response_id %in% setDT(df_second)[treatment_50_64=="Treatment",response_id] ~ "Treatment"
+    response_id %in% setDT(df_second)[treatment_50_59=="Treatment",response_id] ~ "Treatment"
     
-    , response_id %in% setDT(df_second)[treatment_50_64=="Control",response_id] ~ "Control"
+    , response_id %in% setDT(df_second)[treatment_50_59=="Control",response_id] ~ "Control"
     
     , .default = NA_character_
   ))
@@ -438,12 +442,12 @@ df_both <- df_both %>%
 df_outcome_participation <- df_both %>% 
   select(
     response_id,wave
-    ,treatment,treatment_60_64, treatment_50_64
+    ,treatment,treatment_60_64, treatment_50_59
     ,satisfaction_activity_participation
     , q109_3, q109_4, q109_5
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment", "treatment_60_64", "treatment_50_64")
+    id_cols = c("response_id","treatment", "treatment_60_64", "treatment_50_59")
     , names_from = wave
     , values_from = c(satisfaction_activity_participation,q109_3, q109_4, q109_5)
     # , names_prefix = "satisfaction_participation_"
@@ -693,7 +697,7 @@ df_both <- df_both %>%
 df_outcome_cost <- df_both %>% 
   select(
     response_id,wave
-    ,treatment, treatment_60_64, treatment_50_64
+    ,treatment, treatment_60_64, treatment_50_59
 # Has the cost of transit ever prevented you from taking a trip using public transit?    
     , q101
 # Would you say you are riding transit as much as you would like?
@@ -707,7 +711,7 @@ df_outcome_cost <- df_both %>%
     , difficulty_transport_expenses
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment", "treatment_60_64", "treatment_50_64")
+    id_cols = c("response_id","treatment", "treatment_60_64", "treatment_50_59")
     , names_from = wave
     , values_from = c(q100, q101, transit_barrier_cost_related
                       , q103, difficulty_transport_expenses)
@@ -837,13 +841,13 @@ df_outcome_cost <- df_outcome_cost %>%
 df_outcome_trips <- df_both %>% 
   select(
     response_id,wave
-    ,treatment,treatment_60_64, treatment_50_64
+    ,treatment,treatment_60_64, treatment_50_59
     ,starts_with("count")
     , "avg_trips_daily_wave"
     , -c("count_trips_total")
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment","treatment_60_64", "treatment_50_64")
+    id_cols = c("response_id","treatment","treatment_60_64", "treatment_50_59")
     , names_from = wave
     , values_from = count_trips_wave:avg_trips_daily_wave
     # , names_prefix = "satisfaction_participation_"
@@ -873,13 +877,13 @@ df_outcome_trips <- df_outcome_trips %>%  dplyr::left_join(
   df_both %>% 
     filter(wave=="Second") %>% 
     select(response_id
-           ,treatment,treatment_60_64, treatment_50_64
+           ,treatment,treatment_60_64, treatment_50_59
            ,count_trips_total, avg_trips_daily_total)
-  , by = c("response_id","treatment", "treatment_60_64", "treatment_50_64")
+  , by = c("response_id","treatment", "treatment_60_64", "treatment_50_59")
 ) %>% 
   relocate(
     c(count_trips_total,avg_trips_daily_total)
-    , .after = treatment_50_64
+    , .after = treatment_50_59
   ) 
   
 
@@ -946,13 +950,13 @@ Active or transit?
 df_outcome_main <- df_both %>% 
   select(
     response_id,wave
-    ,treatment,treatment_60_64, treatment_50_64
+    ,treatment,treatment_60_64, treatment_50_59
     # ,main_dest
     , main_mode
     , main_type
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment","treatment_60_64", "treatment_50_64")
+    id_cols = c("response_id","treatment","treatment_60_64", "treatment_50_59")
     , names_from = wave
     , values_from = starts_with("main")
     # , names_prefix = "satisfaction_participation_"
@@ -1043,7 +1047,7 @@ df_outcome_main <- df_outcome_main %>%
 ```{r}
 df_outcomes <- dplyr::left_join(
   df_outcome_participation %>% 
-    select(response_id,treatment, treatment_60_64, treatment_50_64 
+    select(response_id,treatment, treatment_60_64, treatment_50_59 
            ,dplyr::matches("delta"))
   , df_outcome_cost %>% 
     select(response_id,dplyr::matches("delta"))
@@ -1370,11 +1374,70 @@ Y <- as.matrix(
 res <- mvoutlier::aq.plot(Y)
 ```
 
+## REMOVE OUTLIERS
+
+
+
+COUNT OUTLIERS
+
+```{r}
+# df_both_outliers %>% 
+#   filter(!is.na(treatment)) %>% 
+#   count(wave, outliers_95, treatment)
+```
+
+REMOVE OUTLIERS
+
+```{r}
+df_both <- df_both_outliers %>% 
+  filter(outliers_95 == "non_outlier")
+```
+
+```{r}
+l_outcomes <- l_outcomes %>% 
+  map(
+    ~ dplyr::left_join(
+      x = .x
+      , y = df_both %>% select(response_id, outliers_95)
+      , by = c("response_id")
+    )
+  ) 
+
+```
+
+
+
+Find *intersection* between non-outliers
+Individuals can be outliers in the first and/or second wave.
+We want to keep the same individuals in the two waves.
+Thus, we need to find the intersection of individuals who are not outliers in both waves.
+
+```{r}
+ids_non_out_first <- df_both %>% 
+  filter(wave=="First") %>% 
+  pull(response_id)
+
+ids_non_out_second <- df_both %>% 
+  filter(wave=="Second") %>% 
+  pull(response_id)
+
+ids_intersect <- base::intersect(ids_non_out_first
+                                 , ids_non_out_second)
+# filter on df_both
+df_both <- df_both %>% 
+  filter(response_id %in% ids_intersect)
+
+# filter on l_outcomes
+l_outcomes <- map(
+  .x = l_outcomes
+  , ~dplyr::filter(.data = .x, response_id %in% ids_intersect)
+)
+```
 
 # SAVE DATA
 
 ```{r}
-save(df_both_outliers, file = "data/df_both_outliers.RData")
+save(df_both, file = "data/df_both_outliers.RData")
 save(l_outcomes, file = "data/l_outcomes.RData")
 ```
 

@@ -895,8 +895,14 @@ df_both <- df_both %>%
     ))
     
     , transit_barrier_cost_related = as.factor(case_when(
+      # only display q25 to those answering no on q100
+      q100 == "No" & 
       str_detect(string = q25, pattern = "I can’t afford it|It’s not worth the cost ") ~ "Yes"
-      , str_detect(string = q25, pattern = "^$|Prefer not to answer") |
+      
+      , q100 == "No" &
+        str_detect(
+        string = q25, pattern = "^$|Prefer not to answer"
+        ) |
         is.na(q25) ~ NA_character_
       , .default = "No"
     ))
@@ -1749,6 +1755,32 @@ df_both <- df_both %>%
     , response_rate = fct_relevel(response_rate, lvls_response)
     )
 
+```
+
+```{r}
+df_both <- df_both %>% 
+  mutate(
+    satisfaction_seeing_friends_family = factor(
+      satisfaction_seeing_friends_family
+      , levels = c("Dissatisfied", "Neither", "Satisfied")
+      , ordered = T
+    )
+    , satisfaction_recreation = factor(
+      satisfaction_recreation
+      , levels = c("Dissatisfied", "Neither", "Satisfied")
+      , ordered = T
+    )
+    , satisfaction_community_events = factor(
+      satisfaction_community_events
+      , levels = c("Dissatisfied", "Neither", "Satisfied")
+      , ordered = T
+    )
+    , satisfaction_activity_participation = factor(
+      satisfaction_activity_participation
+      , levels = c("Dissatisfied", "Neither", "Satisfied")
+      , ordered = T
+    )
+  )
 ```
 
 
