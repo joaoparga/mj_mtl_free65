@@ -957,9 +957,11 @@ df_both %>%
       , .default = NA_character_
     )
   ) %>% 
-  filter(!is.na(new_treat)) %>%
+  filter(!is.na(new_treat) #&
+         # !is.na(treatment_60_65plus)
+         ) %>%
   group_by(age_corrected, wave, new_treat) %>%
-  summarise(avg_trips_age = mean(count_trips_wave, na.rm = T)) %>% 
+  summarise(avg_trips_age = mean(avg_trips_daily_wave, na.rm = T)) %>% 
   mutate(
     age_distance_threshold = case_when(
       is.na(age_corrected) ~ NA_integer_

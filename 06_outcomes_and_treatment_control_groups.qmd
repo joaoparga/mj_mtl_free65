@@ -372,6 +372,44 @@ rm(df_first, df_second)
 ```
 
 
+### option 4
+
+- treatment: 65+ + t1_pass
+- control: 65+ t1_nopass & 60-64 t1_nopass
+
+```{r}
+df_second <- df_both %>% 
+  filter(wave == "Second") %>% 
+  mutate(
+    treatment_60_65plus = case_when(
+      age_corrected >= 65L & has_free_pass_wave2 == "Yes" ~ "Treatment"
+      
+      , age_corrected >= 60L &
+        has_free_pass_wave2 == "No" ~ "Control"
+      
+      , .default = NA_character_
+    )
+  )
+
+df_first <- df_both %>% 
+  filter(wave=="First") %>% 
+  mutate(treatment_60_65plus = case_when(
+    
+    response_id %in% setDT(df_second)[treatment_60_65plus=="Treatment",response_id] ~ "Treatment"
+    
+    , response_id %in% setDT(df_second)[treatment_60_65plus=="Control",response_id] ~ "Control"
+    
+    , .default = NA_character_
+  ))
+
+df_both <- data.table::rbindlist(
+  list(df_first,df_second)
+)
+
+rm(df_first, df_second)
+```
+
+
 # Clean outcome variables
 
 
@@ -442,12 +480,15 @@ df_both <- df_both %>%
 df_outcome_participation <- df_both %>% 
   select(
     response_id,wave
-    ,treatment,treatment_60_64, treatment_50_59
+    ,treatment,treatment_60_64, treatment_50_59, treatment_60_65plus
     ,satisfaction_activity_participation
     , q109_3, q109_4, q109_5
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment", "treatment_60_64", "treatment_50_59")
+    id_cols = c("response_id"
+                ,"treatment", "treatment_60_64", "treatment_50_59"
+                , "treatment_60_65plus"
+                )
     , names_from = wave
     , values_from = c(satisfaction_activity_participation,q109_3, q109_4, q109_5)
     # , names_prefix = "satisfaction_participation_"
@@ -697,7 +738,7 @@ df_both <- df_both %>%
 df_outcome_cost <- df_both %>% 
   select(
     response_id,wave
-    ,treatment, treatment_60_64, treatment_50_59
+    ,treatment, treatment_60_64, treatment_50_59, treatment_60_65plus
 # Has the cost of transit ever prevented you from taking a trip using public transit?    
     , q101
 # Would you say you are riding transit as much as you would like?
@@ -711,7 +752,10 @@ df_outcome_cost <- df_both %>%
     , difficulty_transport_expenses
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment", "treatment_60_64", "treatment_50_59")
+    id_cols = c("response_id"
+                ,"treatment", "treatment_60_64", "treatment_50_59"
+                , "treatment_60_65plus"
+                )
     , names_from = wave
     , values_from = c(q100, q101, transit_barrier_cost_related
                       , q103, difficulty_transport_expenses)
@@ -841,13 +885,16 @@ df_outcome_cost <- df_outcome_cost %>%
 df_outcome_trips <- df_both %>% 
   select(
     response_id,wave
-    ,treatment,treatment_60_64, treatment_50_59
+    ,treatment,treatment_60_64, treatment_50_59, treatment_60_65plus
     ,starts_with("count")
     , "avg_trips_daily_wave"
     , -c("count_trips_total")
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment","treatment_60_64", "treatment_50_59")
+    id_cols = c("response_id"
+                ,"treatment","treatment_60_64", "treatment_50_59"
+                , "treatment_60_65plus"
+                )
     , names_from = wave
     , values_from = count_trips_wave:avg_trips_daily_wave
     # , names_prefix = "satisfaction_participation_"
@@ -877,13 +924,16 @@ df_outcome_trips <- df_outcome_trips %>%  dplyr::left_join(
   df_both %>% 
     filter(wave=="Second") %>% 
     select(response_id
-           ,treatment,treatment_60_64, treatment_50_59
+           ,treatment,treatment_60_64, treatment_50_59, treatment_60_65plus
            ,count_trips_total, avg_trips_daily_total)
-  , by = c("response_id","treatment", "treatment_60_64", "treatment_50_59")
+  , by = c("response_id"
+           ,"treatment", "treatment_60_64", "treatment_50_59"
+           , "treatment_60_65plus"
+           )
 ) %>% 
   relocate(
     c(count_trips_total,avg_trips_daily_total)
-    , .after = treatment_50_59
+    , .after = treatment_60_65plus
   ) 
   
 
@@ -950,13 +1000,16 @@ Active or transit?
 df_outcome_main <- df_both %>% 
   select(
     response_id,wave
-    ,treatment,treatment_60_64, treatment_50_59
+    ,treatment,treatment_60_64, treatment_50_59, treatment_60_65plus
     # ,main_dest
     , main_mode
     , main_type
     ) %>% 
   pivot_wider(
-    id_cols = c("response_id","treatment","treatment_60_64", "treatment_50_59")
+    id_cols = c("response_id"
+                ,"treatment","treatment_60_64", "treatment_50_59"
+                , "treatment_60_65plus"
+                )
     , names_from = wave
     , values_from = starts_with("main")
     # , names_prefix = "satisfaction_participation_"
@@ -1047,7 +1100,9 @@ df_outcome_main <- df_outcome_main %>%
 ```{r}
 df_outcomes <- dplyr::left_join(
   df_outcome_participation %>% 
-    select(response_id,treatment, treatment_60_64, treatment_50_59 
+    select(
+      response_id
+      ,treatment, treatment_60_64, treatment_50_59, treatment_60_65plus
            ,dplyr::matches("delta"))
   , df_outcome_cost %>% 
     select(response_id,dplyr::matches("delta"))
